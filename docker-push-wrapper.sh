@@ -47,7 +47,7 @@ PASSWORD=$(echo $DOCKER_LOGIN | cut -d' ' -f6)
 ECR_URL=$(echo $DOCKER_LOGIN | cut -d' ' -f7 | sed 's~https://~~')
 echo "ECR_URL: $ECR_URL"
 
-DESCRIBE_RESULT=$(aws ecr describe-repositories --region "$EC2_REGION" --repository-names "$IMAGE_NAME" | jq ".repositories[]" | jq -r 'select(.repositoryName == "'${IMAGE_NAME}'")')
+DESCRIBE_RESULT=$(aws ecr describe-repositories --region "$EC2_REGION" --repository-names "$IMAGE_NAME")
 echo "$DESCRIBE_RESULT"
 if [ -z "$DESCRIBE_RESULT" ]; then
   echo "NOT FOUND"
