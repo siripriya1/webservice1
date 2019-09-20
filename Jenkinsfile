@@ -83,8 +83,8 @@ pipeline {
 					sudo ./docker-push-wrapper.sh \
 						--image-name "$IMAGE_NAME" \
 						--tag-name "dev$BUILD_NUMBER"
-					'''
-					sh 'docker rmi $IMAGE_NAME:dev$BUILD_NUMBER'
+					sudo docker rmi $IMAGE_NAME:dev$BUILD_NUMBER'''	
+
 				}
         	}
         }
