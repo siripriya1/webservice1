@@ -1,7 +1,12 @@
 #!groovy
 def branchName
 pipeline {
-	agent any
+    agent {
+        docker {
+            image 'maven:3-alpine' 
+            args '-v /root/.m2:/root/.m2' 
+        }
+    }
     environment {
         IntegrationTestPassed = 'false'
         IMAGE_NAME = 'webservice1'    
