@@ -1,7 +1,7 @@
 #!groovy
 def branchName
 pipeline {
-	agent { label 'ecs' }
+	agent any
     environment {
         IntegrationTestPassed = 'false'
         IMAGE_NAME = 'webservice1'    
