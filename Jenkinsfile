@@ -96,10 +96,10 @@ pipeline {
 					
 					sh '''
 						aws cloudformation deploy --template-file webservice1-service.yaml \
-						--parameters \
-						"ParameterKey=ContainerName,ParameterValue=$IMAGE_NAME" \
-						"ParameterKey=ServiceName,ParameterValue=$IMAGE_NAME" \
-						"ParameterKey=ContainerTag,ParameterValue=$BUILD_NUMBER" \
+						--parameter-overrides \
+						ContainerName=$IMAGE_NAME \
+						ServiceName=$IMAGE_NAME \
+						ContainerTag=$BUILD_NUMBER \
                     --stack-name "webservice1" \
                     --region us-east-1
 					'''
