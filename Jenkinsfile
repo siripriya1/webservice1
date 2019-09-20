@@ -69,7 +69,7 @@ pipeline {
 	    
  	    stage ('Docker Build') {    
 	        steps {
-				sh 'docker build --no-cache -t $IMAGE_NAME:dev$BUILD_NUMBER .'
+				sh 'sudo docker build --no-cache -t $IMAGE_NAME:dev$BUILD_NUMBER .'
 	        }
 	    }
 	    
