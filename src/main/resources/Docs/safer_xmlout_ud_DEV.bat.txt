@@ -1,0 +1,1 @@
+java -Xmx1300m -cp %CLASSPATH% saferXML.saferXMLOut D:\SAFER\SaferXMLOutTransactions\Config\saferXMLOut_DEV.props

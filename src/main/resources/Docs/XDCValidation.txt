@@ -1,0 +1,392 @@
+XDCERRORTOP constant pls_integer := 99999;
+XDCWARNINGBOTTOM constant pls_integer := -99999;
+XDCWARNINGTOP constant pls_integer := 0;
+
+txid=102 in GlobalDef
+    public static final int T21V1 = 102;
+
+saferXMLtransaxDataCheck
+procedure XDCvalidateErr(txid number);
+
+Call XDCvalidateWS
+
+PROCEDURE XDCvalidateWS(txid 		number,
+			err_or_warn	number)
+
+
+CURSOR cur_get_transaction IS
+		SELECT DEFINITION_SQL_STATEMENT
+		FROM SAFER_XML_TRANSACTION
+		WHERE TRANSACTION_ID = txid;
+
+for T0021 (102 txn od): 
+
+returns 
+select count(*) cnt, decode(SENDING_STATE,null,IRP_BASE_STATE ,SENDING_STATE) from GTT_IRP_FLEET_TEMP 
+group by decode(SENDING_STATE,null,IRP_BASE_STATE ,SENDING_STATE) order by cnt desc
+
+select count(*) cnt, decode(SENDING_STATE,null,IRP_BASE_STATE ,SENDING_STATE) from GTT_IRP_FLEET_TEMP 
+group by decode(SENDING_STATE,null,IRP_BASE_STATE ,SENDING_STATE) order by cnt desc
+
+----------- What does it mean ?
+TYPE safer_state_table IS TABLE OF varchar2(2) INDEX BY BINARY_INTEGER;
+	TYPE safer_number_table IS TABLE OF number INDEX BY BINARY_INTEGER;
+	vt_states	safer_state_table;
+	vt_dumnum	safer_number_table;
+
+dbms_output.put_line('Calling XDCvalidateFields. base state count is '||vt_states.count);
+
+FOR i IN vt_states.first .. vt_states.last
+
+dbms_output.put_line('Before calling XDCvalidateFields. base state is '||vt_states(i));
+
+IF err_or_warn >0		-- this is for ERROR
+			THEN
+				XDCvalidateFields(	ibs 			=> vt_states(i),
+							txid 			=> txid,
+							rangeBottom 		=> XDCERRORBOTTOM,
+							rangeTop 		=> XDCERRORTOP);
+
+			ELSE
+				XDCvalidateFields(	ibs 			=> vt_states(i),
+							txid 			=> txid,
+							rangeBottom 		=> XDCWARNINGBOTTOM,
+							rangeTop 		=> XDCWARNINGTOP);
+
+END LOOP;
+
+
+PROCEDURE XDCvalidateFields (ibs in varchar2, txid in number, rangeBottom in number, rangeTop in number)
+IS
+
+	CURSOR cur_get_all_validate_fields IS
+		SELECT distinct f.field_id, f.field_description, f.field_type, f.XMLruleIndex, cf.category_id
+  		FROM XDC_category c, XDC_state_category sc, XDC_category_fields cf, XDC_fields f
+  		WHERE c.category_id = sc.category_id AND sc.category_id = cf.category_id AND cf.field_id = f.field_id
+        	AND f.XMLruleIndex > rangeBottom AND f.XMLruleIndex < rangeTop AND sc.state_code = ibs AND f.tx_id = txid
+		ORDER BY f.field_type;
+
+ACTUAL query is
+
+SELECT distinct f.field_id, f.field_description, f.field_type, f.XMLruleIndex, cf.category_id
+  		FROM XDC_category c, XDC_state_category sc, XDC_category_fields cf, XDC_fields f
+  		WHERE c.category_id = sc.category_id AND sc.category_id = cf.category_id AND cf.field_id = f.field_id
+        AND 
+        f.XMLruleIndex > 0 AND f.XMLruleIndex < 99999 AND 
+        sc.state_code = 'AL' AND f.tx_id = 102
+		ORDER BY f.field_type;
+
+returns 
+
+69	GTT_IRP_FLEET_TEMP.FLEET_NUMBER							C	46	5
+81	GTT_IRP_FLEET_TEMP.FLEET_NUMBER							C	58	2
+68	GTT_IRP_FLEET_TEMP.IRP_ACCOUNT_NUMBER					C	45	5
+80	GTT_IRP_FLEET_TEMP.IRP_ACCOUNT_NUMBER					C	57	2
+88	saferXMLtransaxDataCheck.prc_T0021_check_T0020			R	63	2
+112	saferXMLtransaxDataCheck.prc_check_sending_state		R	78	2
+105	saferXMLtransaxDataCheck.prc_convert_irp_status_code	R	68	14
+
+for
+FOR rec_get_all_validate_fields IN cur_get_all_validate_fields
+
+
+prc_get_table_column_name (	pv_field_description	=> rec_get_all_validate_fields.field_description,
+							pr_table_name		=> tblname,
+							pr_column_name		=> colname)
+
+
+PROCEDURE prc_get_table_column_name(pv_field_description	VARCHAR2,
+						pr_table_name	OUT	VARCHAR2,
+						pr_column_name	OUT	VARCHAR2)
+IS
+	firstdot pls_integer;
+	secondot pls_integer;
+BEGIN
+ 	firstdot := instr(pv_field_description,'.',1,1);
+    	secondot := instr(pv_field_description,'.',1,2);
+
+	IF firstdot > 0 AND secondot =0
+	THEN
+		IF substr(pv_field_description, 1, firstdot- 1) LIKE '%423%'  -- this is schema
+		THEN
+			pr_table_name := pv_field_description;
+    			pr_column_name := '';
+		ELSE
+			pr_table_name:=  substr(pv_field_description, 1, firstdot- 1) ;
+    			pr_column_name := substr(pv_field_description,firstdot+ 1);
+		END IF;
+	ELSIF secondot > firstdot
+	THEN
+    		pr_table_name := substr(pv_field_description, 1, secondot - 1);
+    		pr_column_name := substr(pv_field_description, secondot + 1);
+	ELSE
+		pr_table_name := pv_field_description;
+    		pr_column_name := '';
+	END IF;
+	dbms_output.put_line('In prc_get_table_column_name. input '||pv_field_description);
+	dbms_output.put_line('pr_table_name '||pr_table_name);
+	dbms_output.put_line('pr_column_name '||pr_column_name);
+
+END prc_get_table_column_name;
+
+
+---------------------------------------------
+2018-Oct-08 18:38:51 PM [http-nio-8092-exec-8] INFO  gov.fmcsa.safer.service.impl.t0021.T0021PersistServiceImpl -  State Category id Rules : Length = [7] 
+, [
+RuleInput [field_id=69, field_description=GTT_IRP_FLEET_TEMP.FLEET_NUMBER, field_type=C, XMLruleIndex=46, category_id=5, tableName=GTT_IRP_FLEET_TEMP, columnName=FLEET_NUMBER], 
+RuleInput [field_id=81, field_description=GTT_IRP_FLEET_TEMP.FLEET_NUMBER, field_type=C, XMLruleIndex=58, category_id=2, tableName=GTT_IRP_FLEET_TEMP, columnName=FLEET_NUMBER], 
+RuleInput [field_id=68, field_description=GTT_IRP_FLEET_TEMP.IRP_ACCOUNT_NUMBER, field_type=C, XMLruleIndex=45, category_id=5, tableName=GTT_IRP_FLEET_TEMP, columnName=IRP_ACCOUNT_NUMBER], 
+RuleInput [field_id=80, field_description=GTT_IRP_FLEET_TEMP.IRP_ACCOUNT_NUMBER, field_type=C, XMLruleIndex=57, category_id=2, tableName=GTT_IRP_FLEET_TEMP, columnName=IRP_ACCOUNT_NUMBER], 
+RuleInput [field_id=88, field_description=saferXMLtransaxDataCheck.prc_T0021_check_T0020, field_type=R, XMLruleIndex=63, category_id=2, tableName=saferXMLtransaxDataCheck, columnName=prc_T0021_check_T0020], 
+RuleInput [field_id=112, field_description=saferXMLtransaxDataCheck.prc_check_sending_state, field_type=R, XMLruleIndex=78, category_id=2, tableName=saferXMLtransaxDataCheck, columnName=prc_check_sending_state], 
+RuleInput [field_id=105, field_description=saferXMLtransaxDataCheck.prc_convert_irp_status_code, field_type=R, XMLruleIndex=68, category_id=14, tableName=saferXMLtransaxDataCheck, columnName=prc_convert_irp_status_code]]
+----------------------------------
+
+prc_check_fields(	pn_transaction_id	=> txid,
+						pn_xmlrule_id		=> rec_get_all_validate_fields.XMLruleIndex,
+						pn_category_id		=> rec_get_all_validate_fields.category_id ,
+						pv_field_type		=> rec_get_all_validate_fields.field_type,
+						pv_table_name		=> tblname,
+						pv_column_name		=> colname,
+						pv_base_state		=> ibs);
+
+
+T121V1 constant pls_integer := 102;
+
+
+ELSIF pn_transaction_id =T121V1
+	THEN
+		sql_select := 'SELECT f.irp_account_number, f.irp_base_country, f.irp_base_state, f.fleet_number '||', ';
+
+		vv_table_name :='GTT_IRP_FLEET_TEMP';
+
+		IF pv_table_name LIKE '%IRP_FLEET_TEMP'
+		THEN
+			sql_from_clause :=pv_table_name||' F';
+			vv_table_alias_name :='F.';
+			sql_and_clause := q'! AND F.irp_base_state = '!'||pv_base_state||q'!'!';
+
+		ELSIF pv_table_name LIKE '%IRP_FLEET_NAME_TEMP'
+		THEN
+
+      			sql_from_clause  := vv_table_name||' F, '||pv_table_name||' N';
+			sql_and_clause := q'! AND F.irp_base_state = '!'||pv_base_state||q'!'!';
+			sql_and_clause := sql_and_clause||' AND F.irp_account_number = N.irp_account_number
+						 AND F.irp_base_country = N.irp_base_country
+						 AND F.irp_base_state = N.irp_base_state
+						 AND F.fleet_number = N.fleet_number ';
+			vv_table_alias_name :='N.';
+
+
+
+		ELSIF pv_table_name LIKE '%IRP_FLEET_ADDRESS_TEMP'
+		THEN
+			sql_from_clause  := vv_table_name||' F, '||pv_table_name||' A';
+			sql_and_clause := q'! AND F.irp_base_state = '!'||pv_base_state||q'!'!';
+			sql_and_clause :=sql_and_clause ||' AND F.irp_account_number = A.irp_account_number
+						  AND F.irp_base_country = A.irp_base_country
+						  AND F.irp_base_state = A.irp_base_state
+						  AND F.fleet_number = A.fleet_number';
+			vv_table_alias_name :='A.';
+
+		END IF;
+
+
+IF vv_new_xmlrule_id IS NOT NULL
+	THEN
+		sql_select := sql_select||vv_new_xmlrule_id|| q'!,'!'||pv_column_name||q'! is '||!'||vv_table_alias_name||pv_column_name||' FROM '||sql_from_clause;
+	ELSE
+		sql_select := sql_select||pn_xmlrule_id|| q'!,'!'||pv_column_name||q'! is '||!'||vv_table_alias_name||pv_column_name||' FROM '||sql_from_clause;
+	END IF;
+
+	IF pv_field_type = 'D'
+	THEN
+		sql_where_clause := ' WHERE saferXMLtransaxDataCheck.check_data_field (to_char('||vv_table_alias_name||pv_column_name||'),'||pn_category_id||') ='||XDCERROR;
+
+	ELSE
+		IF vv_jurisdiction IS NOT NULL
+		THEN
+			sql_where_clause := ' WHERE saferXMLtransaxDataCheck.check_data_field ('||vv_table_alias_name||pv_column_name||','||pn_category_id||','||vv_jurisdiction||') ='||XDCERROR;
+		ELSE
+			sql_where_clause := ' WHERE saferXMLtransaxDataCheck.check_data_field ('||vv_table_alias_name||pv_column_name||','||pn_category_id||') ='||XDCERROR;
+		END IF;
+	END IF;
+
+	IF sql_and_clause IS NOT NULL
+	THEN
+		sql_where_clause :=sql_where_clause ||sql_and_clause ;
+	END IF;
+
+ELSIF pn_transaction_id =T120V1
+	THEN
+		EXECUTE IMMEDIATE sql_select||sql_where_clause   BULK COLLECT INTO vt_carrier_irp_rules;
+
+		prc_insert_carrier_irp_rule(	pt_carrier_irp_rules	=> vt_carrier_irp_rules );
+
+	ELSIF  pn_transaction_id =T121V1
+	
+	
+------------------------------------------------------------------------
+
+FUNCTION check_data_field (	pv_data_value 		varchar2,
+					pn_category_id 		number,
+					pv_irp_jurisdiction	varchar2 default null)
+return number
+IS
+
+	dbg_txt			VARCHAR2(2000);
+	vn_min_weight_axles	NUMBER;
+	vn_max_axles		NUMBER;
+	vb_use_weight		BOOLEAN;
+BEGIN
+
+	dbg_txt :='pv_data_value is '||pv_data_value||', pn_category_id is '||pn_category_id ;
+	IF pn_category_id IN (0,1,2,3)
+	THEN  -- MOF, covers checkids 0 thru 3
+
+      	IF pv_data_value is null OR isblank(pv_data_value) = XDCERROR
+		THEN
+        		return (XDCERROR);
+      	END IF;
+
+
+	-- all remaining checkid datatypes are Char
+	ELSIF pn_category_id  = 4 THEN  -- leading zeroes/spaces, trailing spaces
+
+  		IF pv_data_value  is not null AND (leadingZeroSpace(pv_data_value) = XDCERROR OR trailingSpace(pv_data_value) = XDCERROR OR  NOT fn_is_number(pv_input_value => pv_data_value ))
+		THEN
+    			return (XDCERROR);
+  		END IF;
+
+	ELSIF pn_category_id  = 5 THEN  --   leading/trailing spaces
+
+  		IF pv_data_value is not null AND (leadingSpace(pv_data_value) = XDCERROR OR trailingSpace(pv_data_value) = XDCERROR)
+		THEN
+    			return (XDCERROR);
+  		END IF;
+	ELSIF pn_category_id  = 6 THEN    --   irp_weight_carried
+
+  		IF pv_data_value is not null
+		THEN
+
+			IF NOT fn_is_number(pv_input_value => pv_data_value)
+			THEN
+    				return (XDCERROR);
+			ELSE
+-- Li Ma 03/19/2010 SCR 3248 some states use carried_weight field as axles number
+				prc_get_weight_axles_range(	pv_irp_jurisdiction	=> pv_irp_jurisdiction,
+									pr_min_weight_axles	=> vn_min_weight_axles,
+									pr_max_axles		=> vn_max_axles,
+									pr_use_weight		=> vb_use_weight);
+
+				IF vb_use_weight
+				THEN
+					IF to_number(pv_data_value) < vn_min_weight_axles
+					THEN
+						return (XDCERROR);
+					END IF;
+				ELSE  -- use axles
+					IF to_number(pv_data_value) < nvl(vn_min_weight_axles,0) OR ( nvl(vn_max_axles,0) >0 AND to_number(pv_data_value) > vn_max_axles )
+					THEN
+						return (XDCERROR);
+					END IF;
+
+				END IF;
+			END IF;
+  		END IF;
+
+	ELSIF pn_category_id  = 7 THEN  --   out of range A-Z and 0-9
+
+  		IF pv_data_value is not null AND charNotInRangeB(pv_data_value) = XDCERROR
+		THEN
+    			return (XDCERROR);
+  		END IF;
+	ELSIF pn_category_id  = 8 THEN  --  Leading/trailing spaces, special characters: #, "", &
+
+  		IF pv_data_value is not null AND (leadingSpace(pv_data_value) = XDCERROR OR trailingSpace(pv_data_value) = XDCERROR OR
+     			specialcharsB(pv_data_value) = XDCERROR)
+		THEN
+    			return (XDCERROR);
+  		END IF;
+	ELSIF pn_category_id  = 9 THEN   --  leading/ trailing spaces, not(0-9) and not(A-F)
+    		IF pv_data_value is not null AND
+    			(leadingSpace(pv_data_value) = XDCERROR OR trailingSpace(pv_data_value) = XDCERROR OR
+    			charNotInRangeA(pv_data_value) = XDCERROR)
+		THEN
+    			return (XDCERROR);
+  		END IF;
+	ELSIF pn_category_id  = 10 THEN   --  validate vin (17 characters without i,o,q)
+    		IF pv_data_value is not null AND fn_validate_vin(vin	=> pv_data_value ) <0
+		THEN
+    			return (XDCERROR);
+  		END IF;
+	ELSIF pn_category_id  = 11 THEN   --  check vin check digit
+    		IF pv_data_value is not null AND fn_validate_vin(vin	=> pv_data_value )= 0
+		THEN
+    			return (XDCERROR);
+  		END IF;
+	ELSIF pn_category_id  = 16 THEN   --  check dot number is in SAFER
+
+    		IF pv_data_value is not null AND NOT fn_valid_dot(pv_dot_number	=>pv_data_value)
+		THEN
+    			return (XDCERROR);
+  		END IF;
+	ELSIF pn_category_id  = 17 THEN   --  check first two characters is valid state code, and the rest of characters are 9 digit numeric characters.
+
+    		IF pv_data_value is not null AND
+     		( 	length(substr(pv_data_value,1,11)) < 11
+			OR NOT fn_validate_state(pv_state_code	=>substr(pv_data_value,1,2))
+      		OR NOT fn_is_number(substr(pv_data_value,3,9))
+      	)
+		THEN
+    			return (XDCERROR);
+  		END IF;
+
+	END IF;
+	RETURN (XDCVALID);
+
+EXCEPTION
+	WHEN others
+	THEN
+		PKG_EXCEPTION.prc_exception_log(	pv_job_name 	=>  'saferXMLtransaxDataCheck.check_data_field',
+								pv_text       	=>  dbg_txt);
+
+  		return (XDCERROR);
+END check_data_field ;
+
+
+Tables 
+------------------
+CREATE TABLE "DOT423"."XDC_CATEGORY" 
+   (	"CATEGORY_ID" NUMBER, 
+	"CATEGORY_NAME" VARCHAR2(32 BYTE), 
+	 CONSTRAINT "PK_XDC_CATEGORY" PRIMARY KEY ("CATEGORY_ID")
+	 
+
+CREATE TABLE "DOT423"."XDC_CATEGORY_FIELDS" 
+   (	"CATEGORY_ID" NUMBER, 
+	"FIELD_ID" NUMBER, 
+	 CONSTRAINT "PK_XDC_CATEGORY_FIELDS" PRIMARY KEY ("CATEGORY_ID", "FIELD_ID")
+	 
+
+ CREATE TABLE "DOT423"."XDC_STATE_CATEGORY" 
+   (	"STATE_CODE" CHAR(2 BYTE), 
+	"CATEGORY_ID" NUMBER)
+	
+	 
+CREATE TABLE "DOT423"."XDC_FIELDS" 
+   (	"FIELD_ID" NUMBER, 
+	"TX_ID" NUMBER, 
+	"FIELD_DESCRIPTION" VARCHAR2(64 BYTE), 
+	"FIELD_TYPE" CHAR(1 BYTE), 
+	"XMLRULEINDEX" NUMBER, 
+	 CONSTRAINT "PK_XDC_FIELDS" PRIMARY KEY ("FIELD_ID", "TX_ID")
+	 
+	 
+	 check_data_field
+	 
+	 
+	 As of Oracle Database 10.2, you can also use the following notation to define your own delimiter characters for the literal. You choose a character (such as ! in the example below), prefix it with q' and then do not need to escape other single quotation marks inside the pair of literals:
+
+v := q'!I'm a string, you're a string.!';
+

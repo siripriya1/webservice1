@@ -1,0 +1,114 @@
+<?xml version="1.0"?>
+<schema targetNamespace="http://www.safersys.org/namespaces/T0027V1" 
+        xmlns="http://www.w3.org/2001/XMLSchema" 
+        xmlns:ts="http://www.safersys.org/namespaces/T0027V1" 
+        elementFormDefault="qualified">
+
+  <!-- IRP Fleet Output Transaction, T0027V1, Version 1 -->
+
+  <include schemaLocation="globalTypes.xsd"/>
+
+  <!-- Root element -->
+
+  <element name="T0027" type="ts:T0027V1Type"/>
+
+  <!-- Root element type -->
+
+  <complexType name="T0027V1Type">
+    <sequence>
+      <element name="INTERFACE" type="ts:interfaceHeaderType"/>
+      <element name="TRANSACTION" type="ts:transHeaderType"/>
+      <element name="FLEET_ACCOUNT" type="ts:FleetAccountType" 
+               minOccurs="1" maxOccurs="unbounded"/>
+    </sequence>
+  </complexType>
+
+  <!-- Interface header type -->
+
+  <complexType name="interfaceHeaderType">
+    <sequence>
+      <element name="NAME" type="string" fixed="SAFER"/>
+      <element name="VERSION" type="string" fixed="04.03"/>
+    </sequence>
+  </complexType>
+
+  <!-- Transaction header type -->
+
+  <complexType name="transHeaderType">
+    <sequence>
+      <element name="VERSION" type="string" fixed="01.00"/>
+      <element name="OPERATION" type="string" fixed="REPLACE"/>
+      <element name="DATE_TIME" type="dateTime"/>
+      <element name="TZ" type="ts:globalTimeZoneType"/>
+    </sequence>
+  </complexType>
+
+  <!-- Transaction data element type -->
+
+  <complexType name="FleetAccountType">
+    <sequence>
+      <element name="IRP_ACCOUNT_NUMBER">
+        <simpleType>
+          <restriction base="string">
+            <minLength value="1"/>
+            <maxLength value="32"/>
+          </restriction>
+        </simpleType>
+      </element>
+      <element name="IRP_BASE_COUNTRY" type="ts:globalCountryType"/>
+      <element name="IRP_BASE_STATE" type="ts:globalJurisdictionType"/>
+      <element name="SENDING_STATE" type="ts:globalJurisdictionType" minOccurs="0"/>
+      <element name="FLEET_NUMBER">
+        <simpleType>
+          <restriction base="string">
+            <minLength value="1"/>
+            <maxLength value="15"/>
+          </restriction>
+        </simpleType>
+      </element>
+      <element name="FLEET_STATUS_CODE" type="ts:globalIRPStatusCodeType"/>
+      <element name="FLEET_STATUS_DATE" type="date"/>
+      <element name="FLEET_EXPIRE_DATE" type="date"/>
+      <element name="FLEET_UPDATE_DATE" type="date"/>
+      <element name="FLEET_NAME" type="ts:FleetNameType" minOccurs="0" maxOccurs="2"/>
+    </sequence>
+  </complexType>
+
+  <!-- Fleet name element type -->
+
+  <complexType name="FleetNameType">
+    <sequence>
+      <element name="NAME_TYPE" type="ts:globalNameTypeValues"/>
+      <element name="NAME">
+        <simpleType>
+          <restriction base="string">
+            <minLength value="1"/>
+            <maxLength value="120"/>
+          </restriction>
+        </simpleType>
+      </element>
+      <element name="FLEET_ADDRESS" type="ts:FleetAddressType" minOccurs="0" maxOccurs="2"/>
+    </sequence>
+  </complexType>
+
+  <!-- Fleet address element type -->
+
+  <complexType name="FleetAddressType">
+    <sequence>
+      <element name="ADDRESS_TYPE" type="ts:globalAddressTypeValues"/>
+	<!--Business rules check that at least one of STREET_LINE_1, 
+	    STREET_LINE_2, and PO_BOX is present -->
+      <element name="STREET_LINE_1" type="ts:globalString90Type" minOccurs="0"/>
+      <element name="STREET_LINE_2" type="ts:globalString90Type" minOccurs="0"/>
+      <element name="PO_BOX" type="ts:globalString90Type" minOccurs="0"/>
+      <element name="CITY" type="ts:globalString90Type"/>
+      <element name="STATE" type="ts:globalJurisdictionType"/>
+      <element name="ZIP_CODE" type="ts:globalZipType"/>
+      <element name="COUNTY" type="ts:globalString90Type" minOccurs="0"/>
+      <element name="COLONIA" type="ts:globalString90Type" minOccurs="0"/>
+      <element name="COUNTRY" type="ts:globalOptCountryType" minOccurs="0"/>
+    </sequence>
+  </complexType>
+
+</schema>
+

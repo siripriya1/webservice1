@@ -1,0 +1,225 @@
+
+--------------------------------------- safer_xmlout_transactions ---------------------------------
+
+INSERT INTO `fmcsa_safer`.`safer_xmlout_transactions`
+(TRANS_ID,
+TRANS_TYPE,
+STATUS,
+INTERVAL1,
+LAST_PROCESSED_TIME,
+NO_RECORD_PER_FILE,
+KEEP_FOR_DAYS,
+PROGRGAM_NAME,
+FTP_LOCATION,
+BASELINE_FLAG,
+QUERY_STRING,
+TRANS_FULL_TAG,
+TRANS_OPEN_TAG,
+TRANS_CLOSE_TAG,
+STYLE_SHEET_FILE_NAME,
+SCHEMA_FILE_NAME,
+XML_VERSION_STRING,
+ENCODING,
+SUBSCRIPTION_FLAG,
+COMMENTS,
+DEFAULT_RUN_TIME)
+VALUES
+("SNET001V1",
+"SNET001",
+"A",
+1439,
+'20190109',
+50000,
+0,
+"BEGIN PKG_SAFER_XMLOUT_TRANSACTIONS.prc_safer_xmlout_transactions(:trans_id,:trans_type,:trans_mode,:last_process_date,:current_process_date,:no_of_record_per_file );END;",
+"D:\SAFER\SaferXMLOutTransactions\safetynet",
+null,
+null,
+null,
+null,
+null,
+null,
+null,
+null,
+null,
+null,
+null,
+"trunc(sysdate) + 4.5/24 +1");
+
+
+
+INSERT INTO `fmcsa_safer`.`safer_xmlout_transactions`
+(TRANS_ID,
+TRANS_TYPE,
+STATUS,
+INTERVAL1,
+LAST_PROCESSED_TIME,
+NO_RECORD_PER_FILE,
+KEEP_FOR_DAYS,
+PROGRGAM_NAME,
+FTP_LOCATION,
+BASELINE_FLAG,
+QUERY_STRING,
+TRANS_FULL_TAG,
+TRANS_OPEN_TAG,
+TRANS_CLOSE_TAG,
+STYLE_SHEET_FILE_NAME,
+SCHEMA_FILE_NAME,
+XML_VERSION_STRING,
+ENCODING,
+SUBSCRIPTION_FLAG,
+COMMENTS,
+DEFAULT_RUN_TIME)
+VALUES
+("T0031V3",
+"T0031",
+"A",
+1439,
+'20190109',
+3000,
+30,
+"BEGIN PKG_SAFER_XMLOUT_TRANSACTIONS.prc_safer_xmlout_transactions(:trans_id,:trans_type,:trans_mode,:last_process_date,:current_process_date,:no_of_record_per_file );END;",
+"D:/FTP Sites/production/T0031V3",
+"Y",
+"select o.*,
+        cursor (select a.* ,cursor (SELECT b.* ,cursor (SELECT c.*
+   	  FROM carrier_basics_violation c
+   	 WHERE c.dot_number = b.dot_number
+   	 AND c.basics_id =b.basics_id ) VIOLATION
+   	 FROM v_carrier_basics_detail b
+   	 WHERE b.dot_number = o.carrier_id_number) carrier_basics_detail
+	   from carrier_aux_1 a
+         where a.carrier_seq_number = o.carrier_seq_number) carrier_aux,
+       cursor (select i.* from carrier_class i
+        where i.carrier_seq_number = o.carrier_seq_number) class,
+       cursor (select i.* from carrier_cargo i
+        where i.carrier_seq_number = o.carrier_seq_number) cargo,
+       cursor (select i.*
+         from carrier_hazmat i
+        where i.carrier_seq_number = o.carrier_seq_number) hazmat,
+       cursor (select i.*
+         from carrier_review i
+        where i.carrier_seq_number = o.carrier_seq_number
+	  and i.review_type!='F'  order by i.review_date , i.review_type) review
+       from carrier o ,SAFER_XMLOUT_PENDING sxp  where o.carrier_seq_number= sxp.carrier_seq_number AND sxp.TRANS_FILE_ID =? ",
+"<T0031 xmlns="http://www.safersys.org/namespaces/T0031V3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.safersys.org/namespaces/T0031V3 T0031V3.xsd">",
+"<T0031>",
+"</T0031>",
+"T0031V3.xsl",
+"T0031V3.xsd",
+"<?xml version = '1.0' encoding = 'ISO-8859-1'?>",
+"ISO-8859-1",
+"Y",
+"Transaction T0031V3 - MCMIS Safety and Census Output Transaction",
+'trunc(sysdate) + 4.5/24 +1');
+
+
+INSERT INTO `fmcsa_safer`.`safer_xmlout_transactions`
+(TRANS_ID,
+TRANS_TYPE,
+STATUS,
+INTERVAL1,
+LAST_PROCESSED_TIME,
+NO_RECORD_PER_FILE,
+KEEP_FOR_DAYS,
+PROGRGAM_NAME,
+FTP_LOCATION,
+BASELINE_FLAG,
+QUERY_STRING,
+TRANS_FULL_TAG,
+TRANS_OPEN_TAG,
+TRANS_CLOSE_TAG,
+STYLE_SHEET_FILE_NAME,
+SCHEMA_FILE_NAME,
+XML_VERSION_STRING,
+ENCODING,
+SUBSCRIPTION_FLAG,
+COMMENTS,
+DEFAULT_RUN_TIME)
+VALUES
+("T0027V1",
+"T0027",
+"A",
+1439,
+'20190109',
+3000,
+30,
+"BEGIN PKG_SAFER_XMLOUT_TRANSACTIONS.prc_safer_xmlout_transactions(:trans_id,:trans_type,:trans_mode,:last_process_date,:current_process_date,:no_of_record_per_file );END;",
+"D:/FTP Sites/production/T0031V3",
+"Y",
+"select o.*,
+        cursor (select a.* ,cursor (SELECT b.* ,cursor (SELECT c.*
+   	  FROM carrier_basics_violation c
+   	 WHERE c.dot_number = b.dot_number
+   	 AND c.basics_id =b.basics_id ) VIOLATION
+   	 FROM v_carrier_basics_detail b
+   	 WHERE b.dot_number = o.carrier_id_number) carrier_basics_detail
+	   from carrier_aux_1 a
+         where a.carrier_seq_number = o.carrier_seq_number) carrier_aux,
+       cursor (select i.* from carrier_class i
+        where i.carrier_seq_number = o.carrier_seq_number) class,
+       cursor (select i.* from carrier_cargo i
+        where i.carrier_seq_number = o.carrier_seq_number) cargo,
+       cursor (select i.*
+         from carrier_hazmat i
+        where i.carrier_seq_number = o.carrier_seq_number) hazmat,
+       cursor (select i.*
+         from carrier_review i
+        where i.carrier_seq_number = o.carrier_seq_number
+	  and i.review_type!='F'  order by i.review_date , i.review_type) review
+       from carrier o ,SAFER_XMLOUT_PENDING sxp  where o.carrier_seq_number= sxp.carrier_seq_number AND sxp.TRANS_FILE_ID =? ",
+"<T0027 xmlns=... xsi:schemaLocation=http://www.safersys.org/namespaces/.....>",
+"<T0027>",
+"</T0027>",
+"T0027V1.xsl",
+"T0027.xsd",
+"<?xml version = '1.0' encoding = 'ISO-8859-1'?>",
+"ISO-8859-1",
+"Y",
+"Transaction T0027V1 - FLEET Transactions",
+'trunc(sysdate) + 4.5/24 +1');
+
+
+---------------------------------------------- IRP_FLEET_AUDIT --------------------------------
+INSERT INTO `fmcsa_safer`.`irp_fleet_audit`
+(IRP_ACCOUNT_NUMBER,
+IRP_BASE_COUNTRY,
+IRP_BASE_STATE,
+FLEET_NUMBER,
+PROCESS_TIME)
+VALUES
+(23187,
+"US",
+"AL",
+1,
+'20170802');
+
+INSERT INTO `fmcsa_safer`.`irp_fleet_audit`
+(IRP_ACCOUNT_NUMBER,
+IRP_BASE_COUNTRY,
+IRP_BASE_STATE,
+FLEET_NUMBER,
+PROCESS_TIME)
+VALUES
+(83050,
+"US",
+"GA",
+1,
+'20170720');
+
+INSERT INTO `fmcsa_safer`.`irp_fleet_audit`
+(IRP_ACCOUNT_NUMBER,
+IRP_BASE_COUNTRY,
+IRP_BASE_STATE,
+FLEET_NUMBER,
+PROCESS_TIME)
+VALUES
+(154213,
+"US",
+"WI",
+1,
+'20170720');
+
+
+
+SELECT * FROM fmcsa_safer.safer_xmlout_transactions;

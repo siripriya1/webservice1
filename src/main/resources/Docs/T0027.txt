@@ -1,0 +1,27 @@
+7.	SAFER DB calls /u02/oracle/scripts/safer_xmlout_daily.sh every 10 minutes which calls PKG_SAFER_XMLOUT_TRANSACTIONS and does the following (within the DOT423 schema):
+
+C:\Indranil\Work\FMCSA\safer\Application_Svr\SAFERUPLOADSERVICES\src\saferXML
+
+TransactionProcessor class, method : UploadTransaction
+InputTransaction.getNew
+
+Then 
+in UploadTransaction 
+
+calls processTransaction
+
+tx.validate();
+
+tx.truncateWorkingTables();
+
+tx.loadTxToTemp();
+
+tx.applyRulesToTx();
+
+tx.applyTxToDb();
+
+tx.deleteWorkingFiles();
+
+txLog.printLog();
+
+

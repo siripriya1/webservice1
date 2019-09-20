@@ -1,0 +1,1379 @@
+7.	SAFER DB calls /u02/oracle/scripts/safer_xmlout_daily.sh every 10 minutes which calls PKG_SAFER_XMLOUT_TRANSACTIONS and does the following (within the DOT423 schema):
+
+a.	Calls prc_start_xmlout_transactions to process a specific group of T-Files related to a Transaction Type. This looks at the safer_xmlout_transactions table and determines if it can process a file type based on the INTERVAL (in minutes) + LAST_PROCESSED_TIME values for that respective Transaction Type. If the resulting Date and Time are less than Now, the results can be processed. Otherwise, it skips this step.
+
+
+8.	SAFER-TASKS queries the newly available files in the SAFER_XMLOUT_TRANSACTION_FILE table via the Safer_XMLOUT_Daily job which runs every 15 minutes. 
+This calls the D:\SAFER\SaferXMLOutTransactions\bin\safer_xmlout_ud_PRO.bat script
+
+
+this file is available in 
+D:\SAFER\SaferXMLOutTransactions\bin
+
+RDP from 
+ Contents of script 
+ java -Xmx1450m -cp %CLASSPATH% saferXML.saferXMLOut D:\SAFER\SaferXMLOutTransactions\Config\saferXMLOut_PRO.props
+REM java -Xmx1550m -cp %CLASSPATH% saferXML.saferXMLOut D:\SAFER\SaferXMLOutTransactions\Config\saferXMLOut_PRO.props
+
+DISCOVERY : 
+C:\Indranil\Work\FMCSA\safer\Application_Svr\SaferXMLOutTransactions\SaferXMLOutProject\src\saferXML\saferXMLOut.java
+
+getXMLOutput method is called 
+It calls safer_xmlout_transactions table 
+
+then queries SAFER_XMLOUT_TRANSACTION_FILE table with the file status 
+ - gets master data 
+ - get the queryString from there 
+ 
+ 
+ For T0027 : 
+ 
+ " select i.irp_account_number,
+ rtrim(i.irp_base_country) irp_base_country,
+ rtrim(i.irp_base_state) irp_base_state, rtrim(i.sending_state) sending_state,
+ rtrim(i.fleet_number) fleet_number,
+ rtrim(fleet_status_code) fleet_status_code, fleet_status_date,
+ fleet_expire_date, fleet_update_date,
+ cursor (select name_type, name,
+ cursor (select address_type, street_line_1, street_line_2, po_box, city,
+ state, rtrim(zip_code) zip_code, county, colonia, rtrim(country) country
+ from irp_fleet_address a
+ where a.irp_account_number = n.irp_account_number
+ and a.irp_base_country = n.irp_base_country
+ and a.irp_base_state = n.irp_base_state
+ and a.fleet_number = n.fleet_number
+ and a.name_type = n.name_type) addresses
+ from irp_fleet_name n
+ where n.irp_account_number = i.irp_account_number
+ and n.irp_base_country = i.irp_base_country
+ and n.irp_base_state = i.irp_base_state
+ and n.fleet_number = i.fleet_number) names
+ from irp_fleet i,  SAFER_XMLOUT_PENDING  p
+ where i.irp_account_number = p.irp_account_number
+ and i.irp_base_country = p.base_country
+ and i.irp_base_state = p.base_state
+ and i.fleet_number = p.fleet_number
+ AND p.TRANS_FILE_ID =? "
+ 
+ gets the data . 
+ 
+ now use transformXMLQueryResult .
+ 
+ SO FAR this much ...............................
+ 
+ THERE ARE MORE :( 
+ 
+
+WHAT ARE THE STATUS - A/C/P ???? 
+
+C:\Indranil\Work\FMCSA\safer\Application_Svr\SaferXMLOutTransactions\Config
+XSL 
+
+9.	SAFER-TASKS retrieves the resulting data.
+
+10.	The Safer_XMLOUT_Daily job processes the resulting T-Files and pushes them to SAFERP5 under ftp.safersys.org/T00XX, where T00XX represents the resulting T-File.
+
+
+----------------------------------------------------------
+Some log and audit data is available in putty
+/safer-gw/SaferUploadServices/data/work in saferservices.dev-local.safersys.org
+
+login as Indranil.Pal/Password12@!
+
+
+Some log of T0027 is available in RDP : 
+
+D:\FTP Sites\Developement\T0027
+
+--------------- TABLES 
+SAFER_XMLOUT_PENDING , related to SAFER_XMLOUT_TRANSACTION_FILE , many to 1 for SAFER_XMLOUT_TRANSACTION_FILE (FK : TRANS_FILE_ID) 
+SAFER_XMLOUT_TRANSACTION_FILE - real data stays there , i record per file upload , details of the file processing in SAFER_XMLOUT_PENDING??? 
+SAFER_XMLOUT_TRANSACTIONS - Another master table , used during processing to get the queries and program name 
+SAFER_XML_TRANSACTION - Another master table, not related to T0027 
+
+some other table 
+SAFER_XML_PURGE_TRANS_DETAILS
+SAFER_XML_PURGE_TRANSACTIONS
+
+
+--------------------- STORED PROC 
+
+prc_start_xmlout_transactions
+----------------------------- 
+	input : pv_transaction_mode	VARCHAR2 default 'ud',
+			pv_transaction_id		VARCHAR2 default null
+			
+	gets data from safer_xmlout_transactions table where status ='A'
+	
+	for each safer_xmlout_transaction , checks fn_transaction_in_process
+	call another SP prc_remove_old_files
+	
+	executes programs name , for T0027 
+	BEGIN PKG_SAFER_XMLOUT_TRANSACTIONS.prc_safer_xmlout_transactions(:trans_id,:trans_type,:trans_mode,:last_process_date,:current_process_date,:no_of_record_per_file );END;
+	
+   then prc_check_interval
+   and update the table safer_xmlout_transactions with processed_date , status
+   
+   
+   NOTE : The table safer_xmlout_transactions just have date where it was last processed , and the queries, but not file data 
+   
+prc_safer_xmlout_transactions
+-----------------------------
+   input : pv_trans_id like T0027V1
+   		   pv_trans_type like T0027 
+   		   pv_trans_mode like UD/BL 
+   		   pn_no_of_record_per_file
+
+			rec_safer_xmlout_pending safer_xmlout_pending%ROWTYPE; ### What does it mean ? 
+			calls prc_get_safer_xmlout_candidate
+			
+			from the cursor of the data received ie candidates for safer_xmlout_candidates received above 
+			
+			calls prc_create_trans_file
+			
+			when the count is reached 
+			prc_save_xmlout_pending
+			
+			
+			
+			
+prc_get_safer_xmlout_candidate
+----------------------------------
+	input : 
+							pv_trans_id					VARCHAR2,
+							pv_trans_type				VARCHAR2,
+							pv_trans_mode				VARCHAR2,
+							pd_last_process_date			DATE,
+							pd_current_process_date			DATE,
+                    		pr_safer_xmlout_pending		OUT 	ref_cursor
+                    		
+    queries for T0027 : 
+    	selects from irp_fleet_audit for pr_safer_xmlout_pending;  ### Note we did not populate the IRP_FLEET_AUDIT table
+    	for trans_mode BL - queies irp_fleet and puts it in pr_safer_xmlout_pending CURSOR 
+    
+
+prc_create_trans_file
+-------------------------
+
+calls fn_get_trans_file_id to get sequence 
+status = P
+
+inserts into SAFER_XMLOUT_TRANSACTION_FILE
+
+
+prc_save_xmlout_pending
+-------------------------
+
+inserts record in SAFER_XMLOUT_PENDING table 
+
+prc_update_file_status
+---------------------------
+UPDATE SAFER_XMLOUT_TRANSACTION_FILE based on the status received 
+
+fn_get_trans_file_id
+-----------------------
+SELECT TRANS_FILE_ID_SEQ.nextval
+
+
+--------------- Data ----------------------------
+SAFER_XMLOUT_TRANSACTIONS for T0027 
+
+
+T0027V1	T0027	A	59	30-NOV-18	5000	30	BEGIN PKG_SAFER_XMLOUT_TRANSACTIONS.prc_safer_xmlout_transactions(:trans_id,:trans_type,:trans_mode,:last_process_date,:current_process_date,:no_of_record_per_file );END;	D:/FTP Sites/production/T0027	Y	" select i.irp_account_number,
+ rtrim(i.irp_base_country) irp_base_country,
+ rtrim(i.irp_base_state) irp_base_state, rtrim(i.sending_state) sending_state,
+ rtrim(i.fleet_number) fleet_number,
+ rtrim(fleet_status_code) fleet_status_code, fleet_status_date,
+ fleet_expire_date, fleet_update_date,
+ cursor (select name_type, name,
+ cursor (select address_type, street_line_1, street_line_2, po_box, city,
+ state, rtrim(zip_code) zip_code, county, colonia, rtrim(country) country
+ from irp_fleet_address a
+ where a.irp_account_number = n.irp_account_number
+ and a.irp_base_country = n.irp_base_country
+ and a.irp_base_state = n.irp_base_state
+ and a.fleet_number = n.fleet_number
+ and a.name_type = n.name_type) addresses
+ from irp_fleet_name n
+ where n.irp_account_number = i.irp_account_number
+ and n.irp_base_country = i.irp_base_country
+ and n.irp_base_state = i.irp_base_state
+ and n.fleet_number = i.fleet_number) names
+ from irp_fleet i,  SAFER_XMLOUT_PENDING  p
+ where i.irp_account_number = p.irp_account_number
+ and i.irp_base_country = p.base_country
+ and i.irp_base_state = p.base_state
+ and i.fleet_number = p.fleet_number
+ AND p.TRANS_FILE_ID =? "	<T0027 xmlns="http://www.safersys.org/namespaces/T0027V1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.safersys.org/namespaces/T0027V1 T0027V1.xsd">	<T0027>	</T0027>	T0027V1.xsl	T0027V1.xsd	<?xml version = '1.0' encoding = 'ISO-8859-1'?>	ISO-8859-1			
+
+
+
+-------------------------------------- ALL STORED PROCS 
+
+create or replace PACKAGE BODY        PKG_SAFER_XMLOUT_TRANSACTIONS
+AS
+
+TYPE safer_number_t IS TABLE OF NUMBER INDEX BY BINARY_INTEGER;
+TYPE safer_varchar2000_t IS TABLE OF VARCHAR2(2000) INDEX BY BINARY_INTEGER;
+FUNCTION fn_transaction_in_process(	pv_transaction_id		VARCHAR2,
+						pd_current_process_date DATE)
+RETURN boolean;
+PROCEDURE prc_delete_files(pt_trans_file_id	safer_number_t);
+PROCEDURE prc_start_xmlout_transactions(	pv_transaction_mode	VARCHAR2 default 'ud',
+							pv_transaction_id		VARCHAR2 default null)
+IS
+	vv_job_name VARCHAR2(100) := 'PKG_SAFER_XMLOUT_TRANSACTIONS.prc_start_xmlout_transactions';
+	vv_exec_program_name safer_xmlout_transactions.PROGRGAM_NAME%TYPE;
+	dbg_txt	VARCHAR2(5000);
+
+	vd_current_process_date	DATE;
+	CURSOR cur_get_xmlout_transaction IS
+		SELECT TRANS_ID,TRANS_TYPE ,PROGRGAM_NAME,LAST_PROCESSED_TIME,NO_RECORD_PER_FILE,KEEP_FOR_DAYS,DEFAULT_RUN_TIME,INTERVAL
+		FROM  safer_xmlout_transactions
+		WHERE status ='A'
+		AND (
+			(upper(pv_transaction_mode)='BL'
+			AND ( pv_transaction_id IS NULL OR upper(trans_id) =upper(pv_transaction_id) )
+			AND BASELINE_FLAG ='Y')
+			OR
+			( upper(pv_transaction_mode)='UD'
+		 	AND (( pv_transaction_id IS NULL AND INTERVAL >0 AND (vd_current_process_date- LAST_PROCESSED_TIME)*1440 >=INTERVAL )
+				OR
+				( pv_transaction_id IS NOT NULL AND upper(trans_id) =upper(pv_transaction_id))
+			    )
+			)
+		     )
+		ORDER BY TRANS_ID;
+	vn_interval	safer_xmlout_transactions.interval%type;
+BEGIN
+	dbms_output.put_line(vv_job_name);
+
+	vd_current_process_date :=sysdate;
+	FOR rec_get_xmlout_transaction IN cur_get_xmlout_transaction
+	LOOP
+		dbg_txt :='Transaction id is '||rec_get_xmlout_transaction.trans_id;
+		dbms_output.put_line(dbg_txt );
+
+		BEGIN
+			IF upper(pv_transaction_mode) ='BL'
+				OR NOT fn_transaction_in_process(	pv_transaction_id		=> rec_get_xmlout_transaction.trans_id,
+									pd_current_process_date 	=> vd_current_process_date )
+			THEN
+
+			prc_remove_old_files(	pv_transaction_id		=> rec_get_xmlout_transaction.trans_id,
+							pv_transaction_mode	=> pv_transaction_mode,
+							pn_keep_for_days		=> rec_get_xmlout_transaction.keep_for_days);
+
+			vv_exec_program_name :=rec_get_xmlout_transaction.PROGRGAM_NAME ;
+
+			dbg_txt :='trans_id '||rec_get_xmlout_transaction.trans_id||' transaction_mode '||pv_transaction_mode||' LAST_PROCESSED_TIME '||
+			rec_get_xmlout_transaction.LAST_PROCESSED_TIME||' vd_current_process_date '||vd_current_process_date||
+			' NO_RECORD_PER_FILE '||rec_get_xmlout_transaction.NO_RECORD_PER_FILE;
+
+			dbms_output.put_line(dbg_txt );
+			dbms_output.put_line('Before execute '||vv_exec_program_name );
+
+
+ 			EXECUTE IMMEDIATE vv_exec_program_name USING
+			rec_get_xmlout_transaction.trans_id,
+			rec_get_xmlout_transaction.TRANS_TYPE,
+			pv_transaction_mode,
+			rec_get_xmlout_transaction.LAST_PROCESSED_TIME,
+			vd_current_process_date,
+			rec_get_xmlout_transaction.NO_RECORD_PER_FILE;
+
+			IF upper(pv_transaction_mode) ='UD'
+			THEN
+				vn_interval:=rec_get_xmlout_transaction.INTERVAL;
+
+				prc_check_interval(	pv_default_run_time	=> rec_get_xmlout_transaction.DEFAULT_RUN_TIME,
+							pn_interval		=> vn_interval,
+							pd_current_process_date => vd_current_process_date);
+
+
+				UPDATE  safer_xmlout_transactions
+				SET LAST_PROCESSED_TIME = vd_current_process_date ,status ='A',interval =vn_interval
+				WHERE TRANS_ID=rec_get_xmlout_transaction.trans_id;
+			END IF;
+			commit;
+			END IF;
+		EXCEPTION
+			WHEN others
+			THEN
+				rollback;
+
+				PKG_EXCEPTION.prc_exception_log(	pv_job_name 	=>  vv_exec_program_name ,
+										pv_text       	=>  dbg_txt);
+		END;
+
+	END LOOP;
+	commit;
+
+END prc_start_xmlout_transactions;
+
+FUNCTION fn_transaction_in_process(	pv_transaction_id		VARCHAR2,
+					pd_current_process_date 	DATE)
+RETURN boolean
+IS
+	vb_return_value	BOOLEAN :=false;
+	CURSOR cur_get_transaction_status IS
+		SELECT status ,LAST_PROCESSED_TIME
+		FROM  safer_xmlout_transactions
+		WHERE TRANS_ID=pv_transaction_id;
+BEGIN
+	FOR rec_get_transaction_status IN cur_get_transaction_status
+	LOOP
+		IF rec_get_transaction_status.status ='P'
+		THEN
+			vb_return_value :=true;
+		ELSIF rec_get_transaction_status.status ='A' AND rec_get_transaction_status.LAST_PROCESSED_TIME > pd_current_process_date
+		THEN
+			vb_return_value :=true;
+		ELSE
+			UPDATE  safer_xmlout_transactions
+			SET status ='P'
+			WHERE TRANS_ID=pv_transaction_id;
+			commit;
+		END IF;
+	END LOOP;
+	RETURN vb_return_value;
+END fn_transaction_in_process;
+PROCEDURE prc_create_trans_file(	pv_trans_id				VARCHAR2,
+						pv_trans_type			VARCHAR2,
+						pv_trans_mode			VARCHAR2,
+						pd_process_date			DATE,
+						pn_file_index			NUMBER,
+						pr_trans_file_id		OUT	NUMBER)
+IS
+	vt_safer_xmlout_trans_file	SAFER_XMLOUT_TRANSACTION_FILE%ROWTYPE;
+	vn_trans_file_id	NUMBER;
+
+BEGIN
+	vn_trans_file_id :=fn_get_trans_file_id;
+
+	vt_safer_xmlout_trans_file.TRANS_FILE_ID :=vn_trans_file_id;
+	vt_safer_xmlout_trans_file.TRANS_ID  :=pv_trans_id;
+	vt_safer_xmlout_trans_file.TRANS_TYPE :=pv_trans_type;
+	vt_safer_xmlout_trans_file.TRANS_MODE :=lower(pv_trans_mode);
+	vt_safer_xmlout_trans_file.FILE_NAME :=pv_trans_type||'_'||to_char(pd_process_date,'yyyymmddhh24miss')||'_'||pn_file_index||'.'||lower(pv_trans_mode);
+	vt_safer_xmlout_trans_file.FILE_INDEX :=pn_file_index;
+	vt_safer_xmlout_trans_file.PROCESS_START_DATE :=pd_process_date;
+	vt_safer_xmlout_trans_file.STATUS :='P';
+
+	INSERT INTO SAFER_XMLOUT_TRANSACTION_FILE VALUES vt_safer_xmlout_trans_file;
+	pr_trans_file_id :=vn_trans_file_id ;
+
+dbms_output.put_line('Leaving prc_create_trans_file. vn_trans_file_id  is '||vn_trans_file_id );
+
+EXCEPTION
+
+	WHEN OTHERS
+	THEN
+		dbms_output.put_line('prc_create_trans_file. ERROR '||sqlerrm);
+
+		PKG_EXCEPTION.prc_exception_log(	pv_job_name =>  'prc_create_trans_file',
+								pv_text     =>  '');
+
+
+END prc_create_trans_file;
+
+PROCEDURE prc_update_file_status(	pn_trans_file_id	NUMBER,
+					pv_new_status		VARCHAR2,
+					pv_error_message	VARCHAR2,
+					pv_new_file_name	VARCHAR2 default NULL)
+IS
+	vv_job_name VRERROR_LOG.JOBNAME%TYPE := 'PKG_SAFER_XMLOUT_TRANSACTIONS.prc_update_file_status';
+BEGIN
+
+	IF pv_new_status ='C'
+	THEN
+		UPDATE SAFER_XMLOUT_TRANSACTION_FILE
+		SET 	STATUS = pv_new_status,
+			FILE_GENERATED_DATE= sysdate,
+			FILE_NAME =decode( pv_new_file_name,NULL,FILE_NAME,pv_new_file_name)
+		WHERE TRANS_FILE_ID = pn_trans_file_id;
+	ELSE
+
+		UPDATE SAFER_XMLOUT_TRANSACTION_FILE
+		SET 	STATUS = pv_new_status,
+			FAILED_REASON = pv_error_message
+		WHERE TRANS_FILE_ID = pn_trans_file_id;
+	END IF;
+	commit;
+
+EXCEPTION
+
+	WHEN OTHERS
+	THEN
+
+		PKG_EXCEPTION.prc_exception_log(	pv_job_name =>  vv_job_name,
+								pv_text     =>  'Update trans_file_id '||pn_trans_file_id||' failed.');
+
+END prc_update_file_status;
+
+FUNCTION fn_get_trans_file_id
+RETURN NUMBER
+IS
+	vn_return_value	NUMBER;
+BEGIN
+	SELECT TRANS_FILE_ID_SEQ.nextval
+	INTO vn_return_value
+	FROM dual;
+	RETURN vn_return_value;
+END fn_get_trans_file_id;
+
+
+PROCEDURE prc_remove_old_files(	pv_transaction_id		VARCHAR2,
+						pv_transaction_mode	VARCHAR2,
+						pn_keep_for_days		NUMBER)
+IS
+	vv_job_name VARCHAR2(100) := 'PKG_SAFER_XMLOUT_TRANSACTIONS.prc_remove_old_files';
+	dbg_txt	VARCHAR2(5000);
+
+	vt_trans_file_id	safer_number_t;
+BEGIN
+	IF upper(pv_transaction_mode) ='BL'
+	THEN
+		SELECT TRANS_FILE_ID
+		BULK COLLECT INTO vt_trans_file_id
+		FROM SAFER_XMLOUT_TRANSACTION_FILE
+		WHERE TRANS_ID = pv_transaction_id
+		AND upper(TRANS_MODE) ='BL';
+
+	ELSE
+		SELECT TRANS_FILE_ID
+		BULK COLLECT INTO vt_trans_file_id
+		FROM SAFER_XMLOUT_TRANSACTION_FILE
+		WHERE TRANS_ID =  pv_transaction_id
+		AND STATUS ='C'
+		AND trunc(FILE_GENERATED_DATE) < trunc(sysdate) - pn_keep_for_days;
+	END IF;
+
+	dbg_txt :='Delete file count is '||vt_trans_file_id.COUNT;
+
+	prc_delete_files(pt_trans_file_id	=> vt_trans_file_id);
+
+	--  clean up delete transaction logs need to run once a day after mid night
+
+	IF sysdate - trunc(sysdate) < 1/24
+	THEN
+		PKG_SAFER_DEL_XML_TRANSACTIONS.prc_clean_del_transaction_log;
+	END IF;
+
+EXCEPTION
+	WHEN others
+	THEN
+		PKG_EXCEPTION.prc_exception_log(	pv_job_name =>  vv_job_name,
+								pv_text     =>  dbg_txt);
+
+END prc_remove_old_files;
+
+PROCEDURE prc_delete_files(pt_trans_file_id	safer_number_t)
+IS
+	vv_job_name VARCHAR2(100) := 'PKG_SAFER_XMLOUT_TRANSACTIONS.prc_delete_files';
+	dbg_txt	VARCHAR2(5000);
+
+BEGIN
+	IF pt_trans_file_id.count >0
+	THEN
+		dbg_txt :='Befoew delete SAFER_XMLOUT_PENDING. File count is '||pt_trans_file_id.COUNT;
+
+		FOR i IN pt_trans_file_id.first .. pt_trans_file_id.last
+		LOOP
+			DELETE SAFER_XMLOUT_PENDING
+			WHERE TRANS_FILE_ID =pt_trans_file_id(i);
+			commit;
+		END LOOP;
+
+		dbg_txt :='Befoew delete SAFER_XMLOUT_TRANSACTION_FILE. File count is '||pt_trans_file_id.COUNT;
+
+		FORALL i IN pt_trans_file_id.first .. pt_trans_file_id.last
+			DELETE SAFER_XMLOUT_TRANSACTION_FILE
+			WHERE TRANS_FILE_ID =pt_trans_file_id(i);
+
+		commit;
+	END IF;
+EXCEPTION
+	WHEN others
+	THEN
+		 PKG_EXCEPTION.prc_exception_log(	pv_job_name =>  vv_job_name,
+								pv_text     =>  dbg_txt);
+
+END prc_delete_files;
+
+PROCEDURE prc_safer_xmlout_transactions(	pv_trans_id				VARCHAR2,
+							pv_trans_type			VARCHAR2,
+							pv_trans_mode			VARCHAR2,
+							pd_last_process_date		DATE,
+							pd_current_process_date		DATE,
+							pn_no_of_record_per_file	NUMBER)
+IS
+	vv_job_name VARCHAR2(100) := 'PKG_SAFER_XMLOUT_TRANSACTIONS.prc_safer_xmlout_transactions';
+	dbg_txt	VARCHAR2(5000);
+
+
+	vn_file_index		NUMBER :=0;
+	vn_trans_file_id		NUMBER;
+	vt_carrier_id_numbers 	safer_number_t ;
+	vn_count			NUMBER :=0;
+
+	rc_safer_xmlout_pending 	ref_cursor;
+	vt_safer_xmlout_pending 	safer_xmlout_pending_t;
+	vb_new_file		boolean;
+
+	rec_safer_xmlout_pending safer_xmlout_pending%ROWTYPE;
+BEGIN
+	dbms_output.put_line(vv_job_name||' pd_last_process_date is '||to_char(pd_last_process_date));
+
+	prc_get_safer_xmlout_candidate(	pv_trans_id				=> pv_trans_id,
+							pv_trans_type			=> pv_trans_type,
+							pv_trans_mode			=> pv_trans_mode,
+							pd_last_process_date		=> pd_last_process_date,
+							pd_current_process_date		=> pd_current_process_date,
+                    				pr_safer_xmlout_pending		=> rc_safer_xmlout_pending);
+	vb_new_file:=true;
+	LOOP
+    		FETCH rc_safer_xmlout_pending
+    		INTO  rec_safer_xmlout_pending;
+
+		IF rc_safer_xmlout_pending%FOUND
+		THEN
+			IF vb_new_file
+			THEN
+				vn_trans_file_id :=0;
+				vn_file_index:=vn_file_index+1;
+				prc_create_trans_file(	pv_trans_id			=> pv_trans_id,
+								pv_trans_type		=> pv_trans_type,
+								pv_trans_mode		=> pv_trans_mode,
+								pd_process_date		=> pd_current_process_date,
+								pn_file_index		=> vn_file_index,
+								pr_trans_file_id		=> vn_trans_file_id);
+
+				vb_new_file :=false;
+			END IF;
+
+			vn_count :=vn_count + 1 ;
+
+
+			IF vn_count <= pn_no_of_record_per_file
+			THEN
+				rec_safer_xmlout_pending.TRANS_FILE_ID :=vn_trans_file_id;
+				vt_safer_xmlout_pending(vn_count) := rec_safer_xmlout_pending;
+
+				IF pv_trans_type ='SNET001'
+				THEN
+					vt_carrier_id_numbers(vn_count) := to_number(rec_safer_xmlout_pending.CARRIER_ID_NUMBER);
+				END IF;
+
+				IF vn_count = pn_no_of_record_per_file
+				THEN
+					prc_save_xmlout_pending (pt_safer_xmlout_pending	=> vt_safer_xmlout_pending);
+
+					IF pv_trans_type ='SNET001'
+					THEN
+
+						FORALL i IN vt_carrier_id_numbers.first .. vt_carrier_id_numbers.last
+							DELETE SENDLIST_PENDING
+							WHERE SUBSCRIPTION_ID =59
+							AND CARRIER_ID = vt_carrier_id_numbers(i);
+
+					END IF;
+
+					commit;
+					vb_new_file :=true;
+					vn_count :=0;
+					vt_safer_xmlout_pending.delete;
+					vt_carrier_id_numbers.delete;
+				END IF;
+			END IF;
+		ELSE
+			EXIT;
+		END IF;
+  	END LOOP;
+  	CLOSE rc_safer_xmlout_pending;
+
+	IF vt_safer_xmlout_pending.count >0
+	THEN
+		prc_save_xmlout_pending (pt_safer_xmlout_pending	=> vt_safer_xmlout_pending);
+		IF pv_trans_type ='SNET001'
+		THEN
+
+			FORALL i IN vt_carrier_id_numbers.first .. vt_carrier_id_numbers.last
+				DELETE SENDLIST_PENDING
+				WHERE SUBSCRIPTION_ID =59
+				AND CARRIER_ID = vt_carrier_id_numbers(i);
+
+		END IF;
+		commit;
+	END IF;
+
+
+EXCEPTION
+	WHEN others
+	THEN
+		rollback;
+		PKG_EXCEPTION.prc_exception_log(	pv_job_name 	=>  vv_job_name ,
+								pv_text       	=>  dbg_txt);
+
+END prc_safer_xmlout_transactions;
+
+PROCEDURE prc_copy_transaction_file(pn_trans_file_id			NUMBER,
+						pn_no_of_record_per_file	NUMBER default NULL,
+						pv_delete_old_file		VARCHAR2 default 'N')
+IS
+	vv_job_name VARCHAR2(100) := 'PKG_SAFER_XMLOUT_TRANSACTIONS.prc_copy_transaction_file';
+
+	CURSOR cur_get_file_detail IS
+		SELECT TRANS_FILE_ID,TRANS_ID,TRANS_TYPE,TRANS_MODE,PROCESS_START_DATE
+		FROM SAFER_XMLOUT_TRANSACTION_FILE
+		WHERE TRANS_FILE_ID =pn_trans_file_id;
+
+  	vv_trans_id		SAFER_XMLOUT_TRANSACTION_FILE.TRANS_ID%TYPE;
+ 	vv_trans_type 	SAFER_XMLOUT_TRANSACTION_FILE.TRANS_TYPE%TYPE;
+ 	vv_trans_mode	SAFER_XMLOUT_TRANSACTION_FILE.TRANS_MODE%TYPE;
+ 	vn_file_index	SAFER_XMLOUT_TRANSACTION_FILE.FILE_INDEX%TYPE;
+ 	vd_current_process_date	SAFER_XMLOUT_TRANSACTION_FILE.PROCESS_START_DATE%TYPE;
+	vn_trans_file_id	 SAFER_XMLOUT_TRANSACTION_FILE.TRANS_FILE_ID%TYPE;
+	vn_old_trans_file_id	 SAFER_XMLOUT_TRANSACTION_FILE.TRANS_FILE_ID%TYPE;
+
+	vt_safer_xmlout_pending 	safer_xmlout_pending_t;
+	vt_safer_xmlout_pending_new	safer_xmlout_pending_t;
+	vb_new_file		boolean :=true;
+	vn_count	NUMBER :=0;
+	vt_delete_trans_file_id	safer_number_t;
+
+	CURSOR cur_get_next_index IS
+		SELECT max(FILE_INDEX)
+		FROM SAFER_XMLOUT_TRANSACTION_FILE
+		WHERE TRANS_ID =vv_trans_id
+		AND TRANS_MODE =vv_trans_mode
+		AND trunc(PROCESS_START_DATE) =trunc(vd_current_process_date);
+BEGIN
+
+ 	OPEN cur_get_file_detail;
+	FETCH cur_get_file_detail INTO vn_old_trans_file_id,vv_trans_id,vv_trans_type,vv_trans_mode,vd_current_process_date;
+	CLOSE cur_get_file_detail;
+
+	IF  vn_old_trans_file_id IS NOT NULL
+	THEN
+		SELECT *
+		BULK COLLECT INTO vt_safer_xmlout_pending
+		FROM safer_xmlout_pending
+		WHERE TRANS_FILE_ID = vn_old_trans_file_id;
+
+		IF vt_safer_xmlout_pending.count >0
+		THEN
+			OPEN cur_get_next_index ;
+			FETCH cur_get_next_index INTO vn_file_index;
+			CLOSE cur_get_next_index;
+
+			FOR i IN vt_safer_xmlout_pending.first .. vt_safer_xmlout_pending.last
+			LOOP
+
+				IF vb_new_file
+				THEN
+					vn_trans_file_id :=0;
+					vn_file_index:=vn_file_index+1;
+
+					prc_create_trans_file(	pv_trans_id			=> vv_trans_id,
+									pv_trans_type		=> vv_trans_type,
+									pv_trans_mode		=> vv_trans_mode,
+									pd_process_date		=> vd_current_process_date,
+									pn_file_index		=> vn_file_index,
+									pr_trans_file_id		=> vn_trans_file_id);
+
+					vb_new_file :=false;
+				END IF;
+
+				vn_count :=vn_count + 1 ;
+
+
+				IF pn_no_of_record_per_file IS NULL OR vn_count <= pn_no_of_record_per_file
+				THEN
+					vt_safer_xmlout_pending(i).TRANS_FILE_ID :=vn_trans_file_id;
+
+					vt_safer_xmlout_pending_new(vn_count):= vt_safer_xmlout_pending(i);
+
+
+					IF pn_no_of_record_per_file IS NOT NULL  AND vn_count = pn_no_of_record_per_file
+					THEN
+						prc_save_xmlout_pending (pt_safer_xmlout_pending	=> vt_safer_xmlout_pending_new);
+						commit;
+						vb_new_file :=true;
+						vn_count :=0;
+						vt_safer_xmlout_pending_new.delete;
+					END IF;
+				END IF;
+
+			END LOOP;
+
+			IF vt_safer_xmlout_pending_new.count >0
+			THEN
+				prc_save_xmlout_pending (pt_safer_xmlout_pending	=> vt_safer_xmlout_pending_new);
+				commit;
+			END IF;
+			IF upper(pv_delete_old_file) IN ('Y','YES')
+			THEN
+				vt_delete_trans_file_id(1):=vn_old_trans_file_id;
+				prc_delete_files(pt_trans_file_id	=> vt_delete_trans_file_id);
+			END IF;
+		END IF;
+	END IF;
+EXCEPTION
+	WHEN others
+	THEN
+		rollback;
+		PKG_EXCEPTION.prc_exception_log(	pv_job_name 	=>  vv_job_name ,
+								pv_text       	=>  '');
+END prc_copy_transaction_file;
+
+PROCEDURE 	prc_save_xmlout_pending (pt_safer_xmlout_pending	safer_xmlout_pending_t)
+IS
+	vv_job_name VARCHAR2(100) := 'PKG_SAFER_XMLOUT_TRANSACTIONS.prc_save_xmlout_pending';
+	dbg_txt	VARCHAR2(5000);
+	errors PLS_INTEGER :=0;
+
+BEGIN
+	IF pt_safer_xmlout_pending.count >0
+	THEN
+		dbg_txt :=vv_job_name||' before insert SAFER_XMLOUT_PENDING. Count is '||pt_safer_xmlout_pending.count ;
+
+		FORALL i IN pt_safer_xmlout_pending.first .. pt_safer_xmlout_pending.last SAVE EXCEPTIONS
+			INSERT INTO SAFER_XMLOUT_PENDING VALUES pt_safer_xmlout_pending(i);
+		dbg_txt :='After insert, error count is '||SQL%BULK_EXCEPTIONS.COUNT;
+	END IF;
+
+EXCEPTION
+	WHEN OTHERS
+	THEN
+		errors := SQL%BULK_EXCEPTIONS.COUNT;
+		dbms_output.put_line(vv_job_name||' Number of failed: ' || errors);
+
+		PKG_EXCEPTION.prc_exception_log(	pv_job_name => vv_job_name,
+								pv_text     => dbg_txt);
+END prc_save_xmlout_pending;
+
+
+PROCEDURE prc_get_safer_xmlout_candidate(	pv_trans_id					VARCHAR2,
+							pv_trans_type				VARCHAR2,
+							pv_trans_mode				VARCHAR2,
+							pd_last_process_date			DATE,
+							pd_current_process_date			DATE,
+                    				pr_safer_xmlout_pending		OUT 	ref_cursor)
+IS
+BEGIN
+
+	IF upper(pv_trans_mode) ='UD'
+	THEN
+		IF pv_trans_type ='T0025'
+		THEN
+
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER ,
+ 			IFTA_BASE_COUNTRY BASE_COUNTRY,
+ 			IFTA_BASE_STATE  BASE_STATE ,
+ 			IFTA_LICENSE_NUMBER IFTA_LICENSE_NUMBER,
+			PROCESS_TIME PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM carrier_ifta_audit
+			WHERE PROCESS_TIME > pd_last_process_date
+			AND PROCESS_TIME <=  pd_current_process_date
+			ORDER BY PROCESS_TIME ;
+
+		ELSIF pv_trans_type ='T0026'
+		THEN
+
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			IRP_ACCOUNT_NUMBER IRP_ACCOUNT_NUMBER   ,
+ 			IRP_BASE_COUNTRY BASE_COUNTRY,
+ 			IRP_BASE_STATE  BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER,
+			PROCESS_TIME PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM carrier_irp_audit
+			WHERE PROCESS_TIME > pd_last_process_date
+			AND PROCESS_TIME <=  pd_current_process_date
+			ORDER BY PROCESS_TIME ;
+
+		ELSIF pv_trans_type ='T0027'
+		THEN
+
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			FLEET_NUMBER  FLEET_NUMBER ,
+ 			IRP_ACCOUNT_NUMBER IRP_ACCOUNT_NUMBER   ,
+ 			IRP_BASE_COUNTRY BASE_COUNTRY,
+ 			IRP_BASE_STATE  BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER,
+			PROCESS_TIME PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM irp_fleet_audit
+			WHERE PROCESS_TIME > pd_last_process_date
+			AND PROCESS_TIME <=  pd_current_process_date
+			ORDER BY PROCESS_TIME ;
+
+		ELSIF pv_trans_type ='T0028'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+				SELECT
+ 				'' TRANS_FILE_ID ,
+ 				'' IR_SEQ_NUMBER ,
+ 				'' DOCKET_NUMBER ,
+ 				'' CARRIER_SEQ_NUMBER ,
+ 				'' CARRIER_ID_NUMBER ,
+ 				'' ESCREEN_SEQ_NUMBER,
+ 			 	vra.VEHICLE_SEQ_NUMBER ,
+ 			 	vra.LICENSE_SEQ_NUMBER ,
+ 				'' FLEET_NUMBER ,
+ 				'' IRP_ACCOUNT_NUMBER   ,
+ 				'' BASE_COUNTRY,
+ 				'' BASE_STATE ,
+ 				'' IFTA_LICENSE_NUMBER,
+				PROCESS_TIME PROCESS_DATE,
+				'' UCR_SEQ_NUMBER
+				FROM vehicle_registration_audit vra,vehicle_registration vr
+				WHERE PROCESS_TIME > pd_last_process_date
+				AND PROCESS_TIME <=  pd_current_process_date
+				AND vra.vehicle_seq_number = vr.vehicle_seq_number
+   				AND vra.license_seq_number = vr.license_seq_number
+				ORDER BY PROCESS_TIME ;
+		ELSIF pv_trans_type ='T0028D'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+				SELECT
+ 				'' TRANS_FILE_ID ,
+ 				'' IR_SEQ_NUMBER ,
+ 				'' DOCKET_NUMBER ,
+ 				'' CARRIER_SEQ_NUMBER ,
+ 				'' CARRIER_ID_NUMBER ,
+ 				'' ESCREEN_SEQ_NUMBER,
+ 			 	vra.VEHICLE_SEQ_NUMBER ,
+ 			 	vra.LICENSE_SEQ_NUMBER ,
+ 				'' FLEET_NUMBER ,
+ 				'' IRP_ACCOUNT_NUMBER   ,
+ 				'' BASE_COUNTRY,
+ 				'' BASE_STATE ,
+ 				'' IFTA_LICENSE_NUMBER,
+				PROCESS_TIME PROCESS_DATE,
+				'' UCR_SEQ_NUMBER
+				FROM vehicle_registration_audit_del vra,vehicle_registration_delete vrd
+				WHERE PROCESS_TIME > pd_last_process_date
+				AND PROCESS_TIME <=  pd_current_process_date
+				AND vra.vehicle_seq_number = vrd.vehicle_seq_number
+   				AND vra.license_seq_number = vrd.license_seq_number
+				ORDER BY PROCESS_TIME ;
+		ELSIF pv_trans_type ='T0029'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			 ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER   ,
+ 			'' BASE_COUNTRY,
+ 			'' BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER ,
+			PROCESS_TIME PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM vehicle_escreen_audit
+			WHERE PROCESS_TIME > pd_last_process_date
+			AND PROCESS_TIME <=  pd_current_process_date
+			ORDER BY PROCESS_TIME ;
+
+		ELSIF pv_trans_type ='T0030'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER   ,
+ 			'' BASE_COUNTRY,
+ 			'' BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER ,
+			PROCESS_TIME PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM vehicle_inspection_audit
+			WHERE PROCESS_TIME > pd_last_process_date
+			AND PROCESS_TIME <=  pd_current_process_date
+			ORDER BY PROCESS_TIME ;
+
+		ELSIF pv_trans_type ='T0031'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+				SELECT
+ 				'' TRANS_FILE_ID ,
+ 				'' IR_SEQ_NUMBER ,
+ 				'' DOCKET_NUMBER ,
+ 				a.CARRIER_SEQ_NUMBER CARRIER_SEQ_NUMBER ,
+ 				b.CARRIER_ID_NUMBER  CARRIER_ID_NUMBER ,
+ 				'' ESCREEN_SEQ_NUMBER,
+ 				'' VEHICLE_SEQ_NUMBER ,
+ 				'' LICENSE_SEQ_NUMBER ,
+ 				'' FLEET_NUMBER ,
+ 				'' IRP_ACCOUNT_NUMBER   ,
+ 				'' BASE_COUNTRY,
+ 				'' BASE_STATE ,
+ 				'' IFTA_LICENSE_NUMBER,
+				PROCESS_TIME PROCESS_DATE,
+				'' UCR_SEQ_NUMBER
+				FROM carrier_audit a, carrier b
+				WHERE a.carrier_seq_number =b.carrier_seq_number
+				AND a.PROCESS_TIME > pd_last_process_date
+				AND a.PROCESS_TIME <=  pd_current_process_date
+				ORDER BY a.PROCESS_TIME,b.CARRIER_ID_NUMBER;
+
+		ELSIF pv_trans_type ='T0032'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+				SELECT
+ 				'' TRANS_FILE_ID ,
+ 				'' IR_SEQ_NUMBER ,
+ 				a.DOCKET_NUMBER DOCKET_NUMBER ,
+ 				a.CARRIER_SEQ_NUMBER CARRIER_SEQ_NUMBER ,
+ 				b.CARRIER_ID_NUMBER  CARRIER_ID_NUMBER ,
+ 				'' ESCREEN_SEQ_NUMBER,
+ 				'' VEHICLE_SEQ_NUMBER ,
+ 				'' LICENSE_SEQ_NUMBER ,
+ 				'' FLEET_NUMBER ,
+ 				'' IRP_ACCOUNT_NUMBER   ,
+ 				'' BASE_COUNTRY,
+ 				'' BASE_STATE ,
+ 				'' IFTA_LICENSE_NUMBER,
+				PROCESS_TIME PROCESS_DATE,
+				'' UCR_SEQ_NUMBER
+				FROM carrier_li_primary_audit a, carrier b
+				WHERE a.carrier_seq_number =b.carrier_seq_number
+				AND a.PROCESS_TIME > pd_last_process_date
+				AND a.PROCESS_TIME <=  pd_current_process_date
+				ORDER BY a.PROCESS_TIME,b.CARRIER_ID_NUMBER;
+		ELSIF pv_trans_type ='T0033'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			 IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER   ,
+ 			'' BASE_COUNTRY,
+ 			'' BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER ,
+			PROCESS_TIME PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM inspection_audit
+			WHERE PROCESS_TIME > pd_last_process_date
+			AND PROCESS_TIME <=  pd_current_process_date
+			ORDER BY PROCESS_TIME ;
+
+		ELSIF pv_trans_type ='SNET001'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+				SELECT
+ 				'' TRANS_FILE_ID ,
+ 				'' IR_SEQ_NUMBER ,
+ 				'' DOCKET_NUMBER ,
+ 				c.CARRIER_SEQ_NUMBER CARRIER_SEQ_NUMBER ,
+ 				c.CARRIER_ID_NUMBER  CARRIER_ID_NUMBER ,
+ 				'' ESCREEN_SEQ_NUMBER,
+ 				'' VEHICLE_SEQ_NUMBER ,
+ 				'' LICENSE_SEQ_NUMBER ,
+ 				'' FLEET_NUMBER ,
+ 				'' IRP_ACCOUNT_NUMBER   ,
+ 				'' BASE_COUNTRY,
+ 				'' BASE_STATE ,
+ 				'' IFTA_LICENSE_NUMBER,
+				sp.PROCESS_DATE PROCESS_DATE,
+				'' UCR_SEQ_NUMBER
+ 				FROM SENDLIST_PENDING sp, carrier c
+ 				WHERE SUBSCRIPTION_ID =59
+				AND to_char(sp.CARRIER_ID)=c.carrier_id_number
+				ORDER BY sp.PROCESS_DATE,sp.CARRIER_ID;
+
+		ELSIF pv_trans_type ='T0025D'
+		THEN
+
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER ,
+ 			IFTA_BASE_COUNTRY BASE_COUNTRY,
+ 			IFTA_BASE_STATE  BASE_STATE ,
+ 			IFTA_LICENSE_NUMBER IFTA_LICENSE_NUMBER,
+			PROCESS_TIME PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM carrier_ifta_audit_delete
+			WHERE PROCESS_TIME > pd_last_process_date
+			AND PROCESS_TIME <=  pd_current_process_date
+			ORDER BY PROCESS_TIME ;
+
+		ELSIF pv_trans_type ='T0034'
+		THEN
+		OPEN pr_safer_xmlout_pending FOR
+		  SELECT
+            '' TRANS_FILE_ID ,
+            '' IR_SEQ_NUMBER ,
+            case when ucr.MC_NUMBER is not null then ucr.MC_NUMBER
+                 when ucr.ff_number is not null then ucr.ff_number
+                 else
+                   null
+            end as DOCKET_NUMBER,
+            '' CARRIER_SEQ_NUMBER ,
+            ucr.DOT_NUMBER CARRIER_ID_NUMBER ,
+            '' ESCREEN_SEQ_NUMBER,
+            '' VEHICLE_SEQ_NUMBER ,
+            '' LICENSE_SEQ_NUMBER ,
+            '' FLEET_NUMBER ,
+            '' IRP_ACCOUNT_NUMBER   ,
+            '' BASE_COUNTRY,
+            '' BASE_STATE ,
+            '' IFTA_LICENSE_NUMBER ,
+            ucr.LAST_UPDATE_DATE PROCESS_DATE,
+            ucr.UCR_SEQ_NUMBER
+			FROM ucr_registration ucr
+			WHERE ucr.LAST_UPDATE_DATE > pd_last_process_date
+			  AND ucr.LAST_UPDATE_DATE <=  pd_current_process_date
+			ORDER BY ucr.DOT_NUMBER, ucr.MC_NUMBER, ucr.FF_NUMBER, ucr.MC_MX_TAG, ucr.registration_year;
+	    END IF;
+
+	ELSIF upper(pv_trans_mode) ='BL'
+	THEN
+		IF pv_trans_type ='T0025'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			 '' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			''  FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER   ,
+ 			IFTA_BASE_COUNTRY BASE_COUNTRY,
+ 			IFTA_BASE_STATE BASE_STATE ,
+ 			IFTA_LICENSE_NUMBER IFTA_LICENSE_NUMBER ,
+			'' PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM carrier_ifta;
+		ELSIF pv_trans_type ='T0026'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			 '' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			 '' FLEET_NUMBER ,
+ 			 IRP_ACCOUNT_NUMBER IRP_ACCOUNT_NUMBER   ,
+ 			IRP_BASE_COUNTRY BASE_COUNTRY,
+ 			IRP_BASE_STATE BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER,
+			'' PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM carrier_irp;
+		ELSIF pv_trans_type ='T0027'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			 '' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			 FLEET_NUMBER  FLEET_NUMBER ,
+ 			 IRP_ACCOUNT_NUMBER IRP_ACCOUNT_NUMBER   ,
+ 			IRP_BASE_COUNTRY BASE_COUNTRY,
+ 			IRP_BASE_STATE BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER,
+			'' PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM irp_fleet;
+		ELSIF pv_trans_type ='T0028'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+				SELECT
+ 				'' TRANS_FILE_ID ,
+ 				'' IR_SEQ_NUMBER ,
+ 				'' DOCKET_NUMBER ,
+ 				'' CARRIER_SEQ_NUMBER ,
+ 				'' CARRIER_ID_NUMBER ,
+ 				'' ESCREEN_SEQ_NUMBER,
+ 			 	v.VEHICLE_SEQ_NUMBER ,
+ 			 	s.LICENSE_SEQ_NUMBER ,
+ 				'' FLEET_NUMBER ,
+ 				'' IRP_ACCOUNT_NUMBER   ,
+ 				'' BASE_COUNTRY,
+ 				'' BASE_STATE ,
+ 				'' IFTA_LICENSE_NUMBER,
+				'' PROCESS_DATE,
+				'' UCR_SEQ_NUMBER
+				FROM vehicle_registration r, vehicle_state_plate s, vehicle_vin v
+				WHERE  r.license_seq_number=s.license_seq_number
+				AND r.vehicle_seq_number=v.vehicle_seq_number
+				AND r.source_format <> 'PVF';
+		ELSIF pv_trans_type ='T0029'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			 ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER   ,
+ 			'' BASE_COUNTRY,
+ 			'' BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER,
+			'' PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM vehicle_escreen;
+		ELSIF pv_trans_type ='T0030'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			'' IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			i.LICENSE_SEQ_NUMBER LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER   ,
+ 			'' BASE_COUNTRY,
+ 			'' BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER,
+			'' PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM vehicle_inspection i, vehicle_state_plate s
+			WHERE i.license_seq_number = s.license_seq_number ;
+		ELSIF pv_trans_type ='T0031'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+				SELECT
+ 				'' TRANS_FILE_ID ,
+ 				'' IR_SEQ_NUMBER ,
+ 				'' DOCKET_NUMBER ,
+ 				CARRIER_SEQ_NUMBER,
+ 				CARRIER_ID_NUMBER,
+ 				'' ESCREEN_SEQ_NUMBER,
+ 				'' VEHICLE_SEQ_NUMBER ,
+ 				'' LICENSE_SEQ_NUMBER,
+ 				'' FLEET_NUMBER,
+ 				'' IRP_ACCOUNT_NUMBER ,
+ 				'' BASE_COUNTRY ,
+ 				'' BASE_STATE ,
+ 				'' IFTA_LICENSE_NUMBER,
+				'' PROCESS_DATE,
+				'' UCR_SEQ_NUMBER
+				FROM carrier;
+
+		ELSIF pv_trans_type ='T0032'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+				SELECT
+ 				'' TRANS_FILE_ID ,
+ 				'' IR_SEQ_NUMBER ,
+ 				a.DOCKET_NUMBER DOCKET_NUMBER ,
+ 				a.CARRIER_SEQ_NUMBER CARRIER_SEQ_NUMBER ,
+ 				b.CARRIER_ID_NUMBER  CARRIER_ID_NUMBER ,
+ 				'' ESCREEN_SEQ_NUMBER,
+ 				'' VEHICLE_SEQ_NUMBER ,
+ 				'' LICENSE_SEQ_NUMBER ,
+ 				'' FLEET_NUMBER ,
+ 				'' IRP_ACCOUNT_NUMBER   ,
+ 				'' BASE_COUNTRY,
+ 				'' BASE_STATE ,
+ 				'' IFTA_LICENSE_NUMBER,
+				'' PROCESS_DATE,
+				'' UCR_SEQ_NUMBER
+				FROM carrier_li_primary a, carrier b
+				WHERE a.carrier_seq_number =b.carrier_seq_number;
+		ELSIF pv_trans_type ='T0033'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+ 			'' TRANS_FILE_ID ,
+ 			 IR_SEQ_NUMBER ,
+ 			'' DOCKET_NUMBER ,
+ 			'' CARRIER_SEQ_NUMBER ,
+ 			'' CARRIER_ID_NUMBER ,
+ 			'' ESCREEN_SEQ_NUMBER,
+ 			'' VEHICLE_SEQ_NUMBER ,
+ 			'' LICENSE_SEQ_NUMBER ,
+ 			'' FLEET_NUMBER ,
+ 			'' IRP_ACCOUNT_NUMBER   ,
+ 			'' BASE_COUNTRY,
+ 			'' BASE_STATE ,
+ 			'' IFTA_LICENSE_NUMBER,
+			'' PROCESS_DATE,
+			'' UCR_SEQ_NUMBER
+			FROM inspection;
+		ELSIF pv_trans_type ='T0034'
+		THEN
+			OPEN pr_safer_xmlout_pending FOR
+			SELECT
+            '' TRANS_FILE_ID ,
+            '' IR_SEQ_NUMBER ,
+            case when ucr.MC_NUMBER is not null then ucr.MC_NUMBER
+                 when ucr.ff_number is not null then ucr.ff_number
+                 else
+                   null
+            end as DOCKET_NUMBER,
+            '' CARRIER_SEQ_NUMBER ,
+            ucr.DOT_NUMBER CARRIER_ID_NUMBER ,
+            '' ESCREEN_SEQ_NUMBER,
+            '' VEHICLE_SEQ_NUMBER ,
+            '' LICENSE_SEQ_NUMBER ,
+            '' FLEET_NUMBER ,
+            '' IRP_ACCOUNT_NUMBER   ,
+            '' BASE_COUNTRY,
+            '' BASE_STATE ,
+            '' IFTA_LICENSE_NUMBER ,
+            ucr.last_update_date PROCESS_DATE,
+            ucr.UCR_SEQ_NUMBER
+			FROM ucr_registration ucr
+			ORDER BY ucr.DOT_NUMBER, ucr.MC_NUMBER, ucr.FF_NUMBER, ucr.MC_MX_TAG, ucr.registration_year;
+		END IF;
+	END IF;
+EXCEPTION
+	WHEN OTHERS
+	THEN
+		dbms_output.put_line(' In prc_get_safer_xmlout_candidate Error.' ||sqlerrm);
+
+		PKG_EXCEPTION.prc_exception_log(	pv_job_name => 'prc_get_safer_xmlout_candidate ',
+								pv_text     => '');
+
+END prc_get_safer_xmlout_candidate;
+
+
+PROCEDURE prc_check_interval(	pv_default_run_time		VARCHAR2,
+				pn_interval		IN OUT	NUMBER,
+				pd_current_process_date 	DATE)
+IS
+
+	vd_current_process_date	VARCHAR2(50) := to_char(pd_current_process_date,'yyyy-mm-dd hh24:mi:ss');
+
+	vv_statement	VARCHAR2(1000);
+	vn_min_number	NUMBER;
+
+BEGIN
+	IF pv_default_run_time IS NOT NULL
+	THEN
+		vv_statement :='select floor(('||pv_default_run_time||q'!- to_date('!'||vd_current_process_date||q'!','yyyy-mm-dd hh24:mi:ss') ) *24* 60) from dual!';
+
+		dbms_output.put_line('vv_statement is '||vv_statement);
+
+		EXECUTE IMMEDIATE vv_statement INTO vn_min_number;
+		dbms_output.put_line('vn_min_number is '||vn_min_number);
+		pn_interval :=vn_min_number;
+	END IF;
+EXCEPTION
+	WHEN others
+	THEN
+		NULL;
+END prc_check_interval;
+
+
+PROCEDURE prc_change_transaction_status(pv_default_run_time_flag	VARCHAR2,
+					pv_transaction_id		VARCHAR2,
+					pv_new_status_code		VARCHAR2)
+IS
+	vv_statement	VARCHAR2(1000);
+BEGIN
+
+	IF nvl(pv_default_run_time_flag,'N') LIKE 'Y%'
+	THEN
+
+		vv_statement :=q'!UPDATE SAFER_XMLOUT_TRANSACTIONS SET STATUS ='!'||pv_new_status_code||q'!'  WHERE DEFAULT_RUN_TIME IS NOT NULL!';
+
+	ELSIF pv_transaction_id IS NOT NULL
+	THEN
+		vv_statement :=q'!UPDATE SAFER_XMLOUT_TRANSACTIONS SET STATUS ='!'||pv_new_status_code||q'!'  WHERE TRANS_ID ='!'||pv_transaction_id||q'!'!';
+
+	END IF;
+
+	dbms_output.put_line('vv_statement is '||vv_statement);
+
+	IF vv_statement IS NOT NULL
+	THEN
+		EXECUTE IMMEDIATE vv_statement ;
+		commit;
+	END IF;
+
+EXCEPTION
+	WHEN others
+	THEN
+		NULL;
+END prc_change_transaction_status;
+
+
+END PKG_SAFER_XMLOUT_TRANSACTIONS;

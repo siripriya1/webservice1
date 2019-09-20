@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+  <Appenders>
+
+    <!-- Console Appender -->
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{yyyy-MMM-dd HH:mm:ss a} [%t] %-5level %logger{36} - %msg%n" />
+    </Console>
+
+    <!-- Rolling File Appender -->
+    <RollingFile name="RollingFile">
+      <FileName>/safer-new/war/logs/safer-persist-service.log</FileName>
+      <FilePattern>/safer-new/war/logs/safer-persist-service-%d{yyyy-MM-dd-hh-mm}.log.zip</FilePattern>
+      <PatternLayout>
+        <Pattern>%d{yyyy-MMM-dd HH:mm:ss a} [%t] %-5level %logger{36} - %msg%n</Pattern>
+      </PatternLayout>
+      <Policies>
+        <SizeBasedTriggeringPolicy size="1024 KB"/>
+      </Policies>
+      <DefaultRolloverStrategy max="5" />
+    </RollingFile>
+
+  </Appenders>
+  <Loggers>
+    <Logger name="gov.*" level="info" additivity="false">
+      <AppenderRef ref="RollingFile" />
+      <AppenderRef ref="Console" />
+    </Logger>
+    <Root level="info">
+      <AppenderRef ref="RollingFile" />
+      <AppenderRef ref="Console" />
+    </Root>
+  </Loggers>
+</Configuration>

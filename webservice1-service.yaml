@@ -1,0 +1,103 @@
+Description: >
+  This template configures the ECS service for webservice1.
+
+Parameters:
+
+  ProjectName:
+    Description: Project Purpose or Name
+    Type: String
+    Default: webservice1
+
+  Environment:
+    Description: The level of the environment for this Project.
+    Type: String
+    Default: dev
+
+  ECSServiceRole:
+    Description: The ECS Services role ARN.
+    Type: String
+    Default: arn:aws:iam::579510459337:role/ECSServiceRole
+
+  ServicesCluster:
+    Description: The ECS cluster
+    Type: String
+    Default: SAICResearchDev
+
+  TargetGroup:
+    Description: The ECS cluster
+    Type: String
+    Default: arn:aws:elasticloadbalancing:us-east-1:579510459337:targetgroup/Webservice1-dev-TG/2a4a2d216545afdb
+
+  ContainerName:
+    Type: String
+    Description: Name of the container being deployed
+
+  ContainerTag:
+    Type: String
+    Description: Tag of the container being deployed  
+
+  DesiredTasks:
+    Description: Number of Tasks to run per ECS Service.
+    Type: Number
+    Default: 1
+
+  CloudWatchLogsGroup:
+    Description: Number of Cloud watch logs group.
+    Type: String
+
+  ServiceName:
+    Type: String
+    Description: Name of the service being deployed
+    MinLength: 1
+    MaxLength: 64
+
+  VPC:
+    ConstraintDescription: must be the id of an existing VPC.
+    Description: VPC where instances will be created.
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-aa0da4d0
+
+Resources:
+  WebService1Task:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Join [ "-", [ !Ref ContainerName, !Ref Environment] ]
+      ContainerDefinitions:
+      - Essential: 'true'
+        Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ContainerName}:${ContainerTag}'
+        Memory: '1024'
+        Name: !Ref ContainerName
+        PortMappings:
+        #server
+        - ContainerPort: 8001
+          HostPort: 0
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref CloudWatchLogsGroup
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix : !Join [ "-", [ !Ref ContainerName, !Ref Environment] ]
+        Environment:
+        - Name: ENVIRONMENT
+          Value: !Ref Environment     
+
+  Webservice1Service:
+    Type: AWS::ECS::Service
+    DependsOn:
+    - WebService1Task
+    Properties:
+      ServiceName: !Ref ServiceName
+      Cluster: !Ref ServicesCluster
+      DesiredCount: !Ref DesiredTasks
+      LoadBalancers:
+      - ContainerName: !Ref ContainerName
+        ContainerPort: '8001'
+        TargetGroupArn: !Ref TargetGroup       
+      Role: !Ref ECSServiceRole
+      TaskDefinition: !Ref WebService1Task
+      PlacementStrategies:
+      - Field: attribute:ecs.availability-zone
+        Type: spread
+      - Field: instanceId
+        Type: spread
+      HealthCheckGracePeriodSeconds: 600

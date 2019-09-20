@@ -1,0 +1,94 @@
+swagger: '2.0'
+info: 
+  description: Safer-Persist-service
+  version: 1.0.0
+  title: Safer-Persist-service
+  license: 
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+host: localhost
+port: 8092
+basePath: /safer-persist-service/V1 
+schemes:
+  - http 
+paths:
+  '/health': 
+    get: 
+      summary: health check 
+      description: Service health check 
+      operationId: healthCheck 
+      produces:
+        - application/json 
+      parameters:
+      responses: 
+        '200': 
+          description: successful operation 
+          schema:
+            $ref: '#/definitions/HealthSuccessResponse' 
+
+  '/persistFile/{transXMLFileName}': 
+    get: 
+      summary: perist the inspection data privided in the t00018 xml file. 
+      description: Saves the inspection reposrt to the database. 
+      operationId: persistFile 
+      produces:
+        - application/json
+      parameters:
+        - name: transXMLFileName 
+          in: path 
+          description: name of the xml file to be saved to database.
+          required: true 
+          type: string 
+      responses: 
+        '200': 
+          description: successful operation
+          schema:
+            $ref: '#/definitions/SaferPersistT18Response'
+        '400': 
+          description: Invalid file or request 
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '403': 
+          description: Unauthorized error
+          schema:
+            $ref: '#/definitions/ErrorResponse'            
+        '409': 
+          description: Unquie constaint violation(when the record already exists in the databae)
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '500': 
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+definitions: 
+
+  HealthSuccessResponse: 
+    type: object
+    properties: 
+      message: 
+        description: Health success message.
+        type: String
+         
+  SaferPersistT18Response: 
+    type: object
+    properties: 
+      fileName: 
+        description: Name of the file to be persisted.
+        type: String
+      status: 
+        type: int
+        description: Status of the persist request 
+        
+  ErrorResponse: 
+    type: object
+    properties: 
+      timeStamp: 
+        description: Time stamp when the error occured. 
+        type: DateTime
+      message: 
+        type: string
+        description: Error message   
+      details: 
+        type: string
+        description: Details about the error       
+ 

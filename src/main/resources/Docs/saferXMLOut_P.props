@@ -1,0 +1,22 @@
+db.conn=jdbc:oracle:thin:@(DESCRIPTION =(ADDRESS_LIST =(ADDRESS = (PROTOCOL = TCP)(HOST = safer.safersys.org)(PORT = 1526)))(CONNECT_DATA =(SERVICE_NAME = safer.safersys.org)))
+db.user=dot423
+db.pass=dot423
+
+ftp.path=D:/SAFER/SaferXMLOutTransactions/work
+
+xsl.folder=D:/SAFER/SaferXMLOutTransactions/Config/
+Log4j.file=d:/SAFER/SaferXMLOutTransactions/config/Log4j.props
+
+snet.sourceDirectory=D:/SAFER/SaferXMLOutTransactions/safetynet
+snet.archiveDirectory=D:/SAFER/SaferXMLOutTransactions/SafetynetArchive
+snet.controlDirName=D:/SAFER/SaferXMLOutTransactions/Config
+
+;snet.authserver=152.122.44.15
+snet.authserver=ftpsafetynet.safersys.org
+snet.authuser=saferftptest
+snet.authpass=FTPtester2009
+snet.destinationDirectory=/common/testing
+snet.controlFileName=ftptesting.xml
+
+
+  
