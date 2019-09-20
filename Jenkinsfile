@@ -99,7 +99,7 @@ pipeline {
 						--parameter-overrides \
 						ContainerName=$IMAGE_NAME \
 						ServiceName=$IMAGE_NAME \
-						ContainerTag=$BUILD_NUMBER \
+						ContainerTag=dev$BUILD_NUMBER \
                     --stack-name "webservice1" \
                     --region us-east-1
 					'''
