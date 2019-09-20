@@ -80,7 +80,7 @@ pipeline {
 					
 				    sh '''
 				    chmod 755 docker-push-wrapper.sh
-					./docker-push-wrapper.sh \
+					sudo ./docker-push-wrapper.sh \
 						--image-name "$IMAGE_NAME" \
 						--tag-name "dev$BUILD_NUMBER"
 					'''
