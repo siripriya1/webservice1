@@ -29,7 +29,7 @@ pipeline {
 	    stage('Build') {
 	        steps {
 	            sh '''
-	            	mvn install:install-file -Dfile=lib/xmlparser-2.0.jar -DgroupId=com.thoughtworks.xstream -DartifactId=xstream -Dversion=2.0 -Dpackaging=jar
+	        		mvn install:install-file -Dfile=lib/ojdbc7-12.1.0.jar -DgroupId=com.oracle -DartifactId=ojdbc7 -Dversion=12.1.0 -Dpackaging=jar
 	            	mvn -B -Dskip.unit.tests=true clean package'''
 	        }
 	    }
