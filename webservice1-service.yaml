@@ -44,6 +44,7 @@ Parameters:
   CloudWatchLogsGroup:
     Description: Number of Cloud watch logs group.
     Type: String
+    Default: SAIC-research-dev-cluster-cloudWatchLogsGroup
 
   ServiceName:
     Type: String
